@@ -1,1128 +1,682 @@
-/**
- * DEVUP AI SDK — Official Node.js client for the DEVUP AI inference gateway.
- *
- * Provides a zero-dependency HTTP client for all DEVUP AI endpoints plus
- * an optional Vercel AI SDK compatibility layer.
- *
- * @example
- * ```typescript
- * import DevupAI from "devupai";
- *
- * const client = new DevupAI({ apiKey: "dvup_..." });
- *
- * // Chat completion
- * const chat = await client.chat.completions.create({
- *   model: "devup-fast-v1",
- *   messages: [{ role: "user", content: "Hello!" }],
- * });
- *
- * // Image generation
- * const image = await client.images.generate({
- *   model: "devup-image-v1",
- *   prompt: "A sunset over mountains",
- * });
- * ```
- *
- * @module
- */
+import type { components } from "./internal/openapi-schema";
 
+export type ChatCompletion = components['schemas']['ChatCompletionResponse'];
+export type DevUpBilling = components['schemas']['DevUpBilling'];
 
-
-// ─── Error ────────────────────────────────────────────────────────────────────
-
-/**
- * Error thrown by the DEVUP AI API client.
- *
- * Wraps both HTTP errors (non-2xx responses) and network-level errors
- * (DNS failures, connection refused, timeouts).
- *
- * @example
- * ```typescript
- * try {
- *   await client.chat.completions.create({ ... });
- * } catch (err) {
- *   if (err instanceof DevupAPIError) {
- *     console.error(`API error ${err.status}: ${err.message}`);
- *   }
- * }
- * ```
- */
-export class DevupAPIError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-    this.name = 'DevupAPIError';
-  }
+export interface ChatCompletionChunkDelta {
+    role?: "system" | "user" | "assistant" | "tool";
+    content?: string | null;
+    tool_calls?: unknown[];
 }
 
-// ─── Shared Request Options ───────────────────────────────────────────────────
+export interface ChatCompletionChunkChoice {
+    index: number;
+    delta: ChatCompletionChunkDelta;
+    finish_reason?: string | null;
+}
+
+export interface ChatCompletionDeltaChunk {
+    id: string;
+    object: string;
+    created: number;
+    model: string;
+    choices: ChatCompletionChunkChoice[];
+}
+
+export interface ChatCompletionBillingChunk {
+    _devup: DevUpBilling;
+    choices?: never;
+}
+
+export type ChatCompletionChunk =
+    | ChatCompletionDeltaChunk
+    | ChatCompletionBillingChunk;
+
+function stripHeader(headers: Record<string, string>, name: string) {
+    const lower = name.toLowerCase();
+    for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === lower) delete headers[key];
+    }
+}
+
+function buildJsonHeaders(apiKey: string, defaultHeaders?: Record<string, string>, paramsHeaders?: Record<string, string>): Record<string, string> {
+    const headers: Record<string, string> = { ...defaultHeaders, ...paramsHeaders };
+    stripHeader(headers, 'authorization');
+    stripHeader(headers, 'content-type');
+    headers['Authorization'] = `Bearer ${apiKey}`;
+    headers['Content-Type'] = 'application/json';
+    return headers;
+}
+
+function buildMultipartHeaders(apiKey: string, defaultHeaders?: Record<string, string>, paramsHeaders?: Record<string, string>): Record<string, string> {
+    const headers: Record<string, string> = { ...defaultHeaders, ...paramsHeaders };
+    stripHeader(headers, 'authorization');
+    stripHeader(headers, 'content-type');
+    headers['Authorization'] = `Bearer ${apiKey}`;
+    return headers;
+}
+
+function buildPublicHeaders(defaultHeaders?: Record<string, string>, paramsHeaders?: Record<string, string>): Record<string, string> {
+    const headers: Record<string, string> = { ...defaultHeaders, ...paramsHeaders };
+    stripHeader(headers, 'authorization');
+    return headers;
+}
+
+
+function buildAuthHeaders(apiKey: string, defaultHeaders?: Record<string, string>, paramsHeaders?: Record<string, string>): Record<string, string> {
+    const headers: Record<string, string> = { ...defaultHeaders, ...paramsHeaders };
+    stripHeader(headers, 'authorization');
+    headers['Authorization'] = `Bearer ${apiKey}`;
+    return headers;
+}
+
+export type ChatCompletionMessageParam = components['schemas']['ChatCompletionRequest']['messages'][number];
+export type ChatCompletionCreateParams = Omit<components['schemas']['ChatCompletionRequest'], 'stream'> & {
+    stream?: boolean;
+};
+
+export type ImageGenerateParams = Omit<components['schemas']['ImageGenerationRequest'], 'size' | 'n'> & {
+    size?: string;
+    n?: number;
+};
+export type ImageGenerateResponse = components['schemas']['ImageGenerationResponse'];
+
+export type ImageEditParams = Omit<components['schemas']['ImageEditRequest'], 'image' | 'mask' | 'size' | 'n'> & {
+    image: Blob | File | Uint8Array;
+    mask?: Blob | File | Uint8Array;
+    size?: string;
+    n?: number;
+};
+
+export type EmbeddingCreateParams = Omit<components['schemas']['EmbeddingRequest'], 'encoding_format'> & {
+    encoding_format?: "float" | "base64";
+};
+export type EmbeddingCreateResponse = components['schemas']['EmbeddingResponse'];
+
+export type SpeechCreateParams = Omit<components['schemas']['SpeechRequest'], 'voice' | 'response_format'> & {
+    voice?: string;
+    response_format?: "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm";
+};
+export type SpeechResponse = components['schemas']['SpeechResponse'];
+
+export type TranscriptionCreateParams = Omit<components['schemas']['TranscriptionRequest'], 'file' | 'model' | 'response_format'> & {
+    file: Blob | File | Uint8Array;
+    model?: string;
+    response_format?: "json" | "verbose_json" | "text" | "srt" | "vtt";
+};
+export type TranscriptionResponse = components['schemas']['TranscriptionResponse'];
+export type TranscriptionVerboseResponse = components['schemas']['TranscriptionVerboseResponse'];
+
+export type VideoGenerationCreateParams = components['schemas']['VideoGenerationRequest'];
+export type VideoGenerationResponse = components['schemas']['VideoGenerationResponse'];
+export type VideoEditCreateParams = Omit<components['schemas']['VideoEditRequest'], 'video' | 'mask' | 'key_points' | 'frame_index' | 'auto_trim' | 'preserve_audio' | 'background_color' | 'desired_increase'> & {
+    video: Blob | File | Uint8Array;
+    mask?: Blob | File | Uint8Array;
+    key_points?: string | VideoKeyPoint[];
+    frame_index?: number;
+    auto_trim?: boolean;
+    preserve_audio?: boolean;
+    background_color?: string;
+    desired_increase?: 2 | 4;
+};
+export type VideoKeyPoint = {
+    x: number;
+    y: number;
+    type: "positive" | "negative";
+};
+// VideoEdit Response is same as VideoGenerationResponse
+
+export type ModelListResponse = components['schemas']['ModelListResponse'];
+export type ModelObject = components['schemas']['ModelObject'];
+export type BalanceResponse = components['schemas']['BalanceResponse'];
+export type HealthResponse = components['schemas']['HealthResponse'];
 
 /**
  * Common request options available on all resource methods.
  */
 export interface RequestOptions {
-  /** Abort signal to cancel the request. */
-  signal?: AbortSignal | null;
-
-  /** Request timeout in milliseconds. */
-  timeout?: number;
-}
-
-// ─── Content Parts (multimodal) ───────────────────────────────────────────────
-
-/**
- * A text content part for multimodal messages.
- */
-export interface TextContentPart {
-  type: 'text';
-  text: string;
+    /** Abort signal to cancel the request. */
+    signal?: AbortSignal | null;
+    /** Request timeout in milliseconds. */
+    timeout?: number;
+    /** Custom headers to send with the request. */
+    headers?: Record<string, string>;
 }
 
 /**
- * An image URL content part for multimodal/vision messages.
+ * Error thrown by the DEVUP AI API client.
  */
-export interface ImageURLContentPart {
-  type: 'image_url';
-  image_url: {
-    /** URL of the image (supports http/https and base64 data URIs). */
-    url: string;
-    /** Image detail level for vision processing. */
-    detail?: 'low' | 'high' | 'auto';
-  };
+export class DevupAPIError extends Error {
+    readonly status: number;
+    readonly type: string | undefined;
+    readonly code: string | undefined;
+    readonly requestId: string | null;
+    readonly retryAfter: string | null;
+    readonly headers: Record<string, string>;
+    readonly cause: unknown;
+
+    constructor(
+        status: number,
+        message: string,
+        errorData?: { type?: string; code?: string },
+        headers?: Headers,
+        cause?: unknown
+    ) {
+        super(message);
+        this.status = status;
+        this.type = errorData?.type;
+        this.code = errorData?.code;
+        this.cause = cause;
+        this.name = 'DevupAPIError';
+
+        const headersRecord: Record<string, string> = {};
+        if (headers) {
+            headers.forEach((val, key) => {
+                headersRecord[key.toLowerCase()] = val;
+            });
+        }
+        this.headers = headersRecord;
+        this.requestId = headersRecord['x-request-id'] || null;
+        this.retryAfter = headersRecord['retry-after'] || null;
+
+        Object.setPrototypeOf(this, new.target.prototype);
+    }
 }
 
-/**
- * A content part in a multimodal message.
- */
-export type ContentPart = TextContentPart | ImageURLContentPart;
-
-// ─── Chat Types ───────────────────────────────────────────────────────────────
-
-/**
- * A chat completion message parameter.
- * Supports both simple string content and multimodal content arrays.
- */
-export interface ChatCompletionMessageParam {
-  /** The role of the message author. */
-  role: 'system' | 'user' | 'assistant' | 'tool';
-
-  /**
-   * The content of the message.
-   * Use a string for text-only messages, or an array of ContentPart for multimodal input.
-   */
-  content: string | ContentPart[];
-
-  /** Tool call ID (for tool role messages). */
-  tool_call_id?: string;
-
-  /** Tool calls made by the assistant. */
-  tool_calls?: ChatCompletionToolCall[];
-}
-
-/**
- * A tool call in a chat completion response.
- */
-export interface ChatCompletionToolCall {
-  id: string;
-  type: 'function';
-  function: {
-    name: string;
-    arguments: string;
-  };
-}
-
-/**
- * A tool definition for function calling.
- */
-export interface ChatCompletionTool {
-  type: 'function';
-  function: {
-    /** The name of the function to call. */
-    name: string;
-    /** A description of what the function does. */
-    description?: string;
-    /** The parameters the function accepts (JSON Schema). */
-    parameters?: Record<string, unknown>;
-  };
-}
-
-/**
- * Parameters for creating a chat completion.
- */
-export interface ChatCompletionCreateParams extends RequestOptions {
-  /** The model to use for completion. */
-  model: DevUpModel;
-
-  /** The messages to generate a completion for. */
-  messages: ChatCompletionMessageParam[];
-
-  /** Whether to stream the response. */
-  stream?: boolean;
-
-  /** Sampling temperature (0-2). Higher = more random. */
-  temperature?: number;
-
-  /** Maximum number of tokens to generate. */
-  max_tokens?: number;
-
-  /** Nucleus sampling parameter. */
-  top_p?: number;
-
-  /** Stop sequences — generation stops when any of these are produced. */
-  stop?: string | string[];
-
-  /** Penalizes tokens based on their frequency in the output so far (-2.0 to 2.0). */
-  frequency_penalty?: number;
-
-  /** Penalizes tokens based on whether they appear in the output so far (-2.0 to 2.0). */
-  presence_penalty?: number;
-
-  /** Random seed for deterministic generation. */
-  seed?: number;
-
-  /** Response format specification. */
-  response_format?: { type: 'text' | 'json_object' | 'json_schema' };
-
-  /** Tools (functions) the model may call. */
-  tools?: ChatCompletionTool[];
-
-  /** Controls how the model selects tools. */
-  tool_choice?:
-    | 'none'
-    | 'auto'
-    | 'required'
-    | { type: 'function'; function: { name: string } };
-}
-
-/**
- * A chat completion response.
- */
-export interface ChatCompletion {
-  id: string;
-  object: 'chat.completion';
-  created: number;
-  model: string;
-  choices: {
-    index: number;
-    message: ChatCompletionMessageParam;
-    finish_reason: string;
-  }[];
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
-
-/**
- * A streamed chat completion chunk.
- */
-export interface ChatCompletionChunk {
-  id: string;
-  object: 'chat.completion.chunk';
-  created: number;
-  model: string;
-  choices: {
-    index: number;
-    delta: Partial<ChatCompletionMessageParam>;
-    finish_reason: string | null;
-  }[];
-}
-
-/**
- * Known DEVUP AI model identifiers, with support for any custom string.
- */
-export type DevUpModel =
-  | 'devup-coder-v1'
-  | 'devup-fast-v1'
-  | 'devup-reasoning-v1'
-  | 'devup-vision-v1'
-  | (string & {});
-
-/**
- * Configuration options for the DEVUP AI HTTP client.
- */
 export interface DevUpAIOptions {
-  /** Your DEVUP AI API key. */
-  apiKey: string;
-
-  /**
-   * Base URL for the API.
-   * @default "https://api.devupai.com/v1"
-   */
-  baseURL?: string;
+    apiKey: string;
+    baseURL?: string;
+    headers?: Record<string, string>;
 }
 
-// ─── Images Types ─────────────────────────────────────────────────────────────
+// Internal helpers
 
-/** Parameters for image generation. */
-export interface ImageGenerateParams extends RequestOptions {
-  /** The model to use for image generation. */
-  model: string;
 
-  /** A text prompt describing the desired image. */
-  prompt: string;
 
-  /** Number of images to generate. @default 1 */
-  n?: number;
-
-  /** Image dimensions (e.g. "1024x1024"). */
-  size?: string;
-
-  /** Output format. */
-  response_format?: 'url' | 'b64_json';
-
-  /** Number of denoising steps. */
-  num_inference_steps?: number;
-
-  /** Classifier-free guidance scale. */
-  guidance_scale?: number;
-
-  /** Negative prompt — what to avoid in the image. */
-  negative_prompt?: string;
-
-  /** Random seed for reproducibility. */
-  seed?: number;
-}
-
-/** Response from image generation. */
-export interface ImageGenerateResponse {
-  data: Array<{ url?: string; b64_json?: string }>;
-}
-
-// ─── Embeddings Types ─────────────────────────────────────────────────────────
-
-/** Parameters for creating embeddings. */
-export interface EmbeddingCreateParams extends RequestOptions {
-  /** The model to use for embeddings. */
-  model: string;
-
-  /** The text(s) to embed. */
-  input: string | string[];
-
-  /** Encoding format for the embedding values. */
-  encoding_format?: 'float' | 'base64';
-}
-
-/** A single embedding object. */
-export interface EmbeddingObject {
-  object: 'embedding';
-  embedding: number[];
-  index: number;
-}
-
-/** Response from embedding creation. */
-export interface EmbeddingCreateResponse {
-  object: 'list';
-  data: EmbeddingObject[];
-  model: string;
-  usage: {
-    prompt_tokens: number;
-    total_tokens: number;
-  };
-}
-
-// ─── Audio Types ──────────────────────────────────────────────────────────────
-
-/** Parameters for text-to-speech synthesis. */
-export interface SpeechCreateParams extends RequestOptions {
-  /** The TTS model to use. */
-  model: string;
-
-  /** The text to synthesize. */
-  input: string;
-
-  /** The voice to use. */
-  voice?: string;
-
-  /** Audio output format. */
-  response_format?: 'mp3' | 'wav' | 'opus' | 'flac';
-
-  /** Speech speed multiplier (0.25 to 4.0). */
-  speed?: number;
-}
-
-/** Parameters for audio transcription (speech-to-text). */
-export interface TranscriptionCreateParams extends RequestOptions {
-  /** The ASR model to use. */
-  model: string;
-
-  /** The audio file to transcribe. Accepts Blob, File, or Uint8Array. */
-  file: Blob | File | Uint8Array;
-
-  /** Language of the audio (ISO 639-1 code). */
-  language?: string;
-
-  /** Optional prompt to guide the transcription. */
-  prompt?: string;
-
-  /** Output format. */
-  response_format?: 'json' | 'text' | 'srt' | 'vtt';
-}
-
-/** Response from audio transcription. */
-export interface TranscriptionResponse {
-  text: string;
-}
-
-// ─── Video Types ──────────────────────────────────────────────────────────────
-
-/** Parameters for video generation. */
-export interface VideoGenerationCreateParams extends RequestOptions {
-  /** The video generation model to use. */
-  model: string;
-
-  /** A text prompt describing the desired video. */
-  prompt: string;
-
-  /** Negative prompt — what to avoid. */
-  negative_prompt?: string;
-
-  /** Video width in pixels. */
-  width?: number;
-
-  /** Video height in pixels. */
-  height?: number;
-
-  /** Number of frames to generate. */
-  num_frames?: number;
-
-  /** Random seed for reproducibility. */
-  seed?: number;
-}
-
-/** Response from video generation. */
-export interface VideoGenerationResponse {
-  data: Array<{ url: string }>;
-}
-
-// ─── Reranking Types ──────────────────────────────────────────────────────────
-
-/** Parameters for document reranking. */
-export interface RerankingCreateParams extends RequestOptions {
-  /** The reranking model to use. */
-  model: string;
-
-  /** The search query. */
-  query: string;
-
-  /** The documents to rerank. */
-  documents: string[];
-
-  /** Maximum number of results to return. */
-  top_n?: number;
-
-  /** Whether to include document text in the response. */
-  return_documents?: boolean;
-}
-
-/** A single reranking result. */
-export interface RerankingResult {
-  index: number;
-  relevance_score: number;
-  document?: string;
-}
-
-/** Response from reranking. */
-export interface RerankingCreateResponse {
-  results: RerankingResult[];
-}
-
-// ─── Models Types ─────────────────────────────────────────────────────────────
-
-/** A model object from the models listing endpoint. */
-export interface ModelObject {
-  id: string;
-  object: 'model';
-  created: number;
-  owned_by: string;
-}
-
-/** Response from listing available models. */
-export interface ModelListResponse {
-  object: 'list';
-  data: ModelObject[];
-}
-
-// ─── Signal Composition Utility ───────────────────────────────────────────────
-
-/**
- * Composes multiple AbortSignals into a single signal that aborts
- * when ANY of the input signals abort.
- *
- * Works in Node.js 18+ (no AbortSignal.any required).
- */
-function composeSignals(signals: AbortSignal[]): AbortSignal {
-  if (signals.length === 1) return signals[0];
-
-  const controller = new AbortController();
-
-  for (const signal of signals) {
-    if (signal.aborted) {
-      controller.abort(signal.reason);
-      return controller.signal;
+function buildSignal(options: RequestOptions) {
+    const controller = new AbortController();
+    let timeoutId: any;
+    if (options.timeout) {
+        timeoutId = setTimeout(() => controller.abort(), options.timeout);
     }
-    signal.addEventListener(
-      'abort',
-      () => controller.abort(signal.reason),
-      { once: true },
-    );
-  }
-
-  return controller.signal;
-}
-
-/**
- * Builds an AbortSignal from RequestOptions, composing user signal + timeout.
- * Returns the signal and a cleanup function to clear the timeout.
- */
-function buildSignal(
-  options: RequestOptions,
-): { signal: AbortSignal; cleanup: () => void } {
-  const controller = new AbortController();
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
-  if (options.timeout) {
-    timeoutId = setTimeout(() => controller.abort('timeout'), options.timeout);
-  }
-
-  const signals: AbortSignal[] = [controller.signal];
-  if (options.signal) signals.push(options.signal);
-
-  const signal = composeSignals(signals);
-
-  return {
-    signal,
-    cleanup: () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    },
-  };
-}
-
-// ─── Fetch Helpers ────────────────────────────────────────────────────────────
-
-/**
- * Wraps fetch to catch network errors and throw DevupAPIError.
- */
-async function safeFetch(
-  url: string,
-  init: RequestInit,
-): Promise<Response> {
-  try {
-    return await fetch(url, init);
-  } catch (err) {
-    // Re-throw AbortError as-is so callers can detect cancellation
-    if (err instanceof DOMException && err.name === 'AbortError') {
-      throw err;
+    if (options.signal) {
+        options.signal.addEventListener('abort', () => controller.abort());
     }
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw err;
-    }
-    throw new DevupAPIError(
-      0,
-      `Network error: ${(err as Error).message}`,
-    );
-  }
+    return {
+        signal: controller.signal,
+        cleanup: () => { if (timeoutId) clearTimeout(timeoutId); }
+    };
 }
 
-/**
- * Throws a DevupAPIError if the response is not ok.
- */
+function stripRequestOptions<T extends RequestOptions>(params: T): Omit<T, keyof RequestOptions> {
+    const { headers: _headers, timeout: _timeout, signal: _signal, ...rest } = params;
+    return rest;
+}
+
+async function safeFetch(url: string, init: RequestInit): Promise<Response> {
+    try {
+        return await fetch(url, init);
+    } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") throw err;
+        if (err instanceof Error && err.name === "AbortError") throw err;
+        let msg = 'Unknown error';
+        if (err instanceof Error && err.message) {
+            msg = err.message;
+        } else if (typeof err === 'string' && err) {
+            msg = err;
+        } else if (err && typeof err === 'object') {
+            const str = String(err);
+            if (str !== '[object Object]') {
+                msg = str;
+            }
+        }
+        throw new DevupAPIError(0, `Network error: ${msg}`, undefined, undefined, err);
+    }
+}
+
 async function throwIfNotOk(response: Response): Promise<void> {
-  if (response.ok) return;
+    if (response.ok) return;
 
-  let errorMsg = response.statusText;
-  try {
-    const errBody = await response.json();
-    errorMsg = errBody.error?.message || JSON.stringify(errBody);
-  } catch {
-    // Ignore JSON parse error
-  }
-  throw new DevupAPIError(response.status, errorMsg);
+    let errorMsg = response.statusText;
+    let errorData: { type?: string; code?: string } | undefined;
+
+    const bodyText = await response.text().catch(() => "");
+
+    if (bodyText) {
+        try {
+            const errBody = JSON.parse(bodyText);
+            if (errBody && errBody.error && typeof errBody.error === "object") {
+                if (errBody.error.message) {
+                    errorMsg = errBody.error.message;
+                } else {
+                    errorMsg = bodyText;
+                }
+                errorData = {
+                    type: errBody.error.type,
+                    code: errBody.error.code
+                };
+            } else {
+                errorMsg = bodyText;
+            }
+        } catch {
+            errorMsg = bodyText;
+        }
+    }
+
+    if (!errorMsg || errorMsg.trim() === "") {
+        errorMsg = `HTTP ${response.status}`;
+    }
+
+    throw new DevupAPIError(
+        response.status,
+        errorMsg,
+        errorData,
+        response.headers,
+        undefined
+    );
 }
-
-/**
- * Strips RequestOptions fields from params before sending to the API.
- */
-function stripRequestOptions<T extends RequestOptions>(
-  params: T,
-): Omit<T, 'signal' | 'timeout'> {
-  const { signal: _s, timeout: _t, ...rest } = params;
-  return rest;
-}
-
-// ─── Completions ──────────────────────────────────────────────────────────────
 
 class Completions {
-  private apiKey: string;
-  private baseURL: string;
 
-  constructor(apiKey: string, baseURL: string) {
-    this.apiKey = apiKey;
-    this.baseURL = baseURL;
-  }
 
-  /**
-   * Creates a streaming chat completion.
-   * @param params - Chat completion parameters with `stream: true`.
-   * @returns An async iterable of chat completion chunks.
-   */
-  async create(
-    params: ChatCompletionCreateParams & { stream: true },
-  ): Promise<AsyncIterable<ChatCompletionChunk>>;
+    constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
 
-  /**
-   * Creates a non-streaming chat completion.
-   * @param params - Chat completion parameters.
-   * @returns A complete chat completion response.
-   */
-  async create(
-    params: ChatCompletionCreateParams & { stream?: false },
-  ): Promise<ChatCompletion>;
-
-  async create(
-    params: ChatCompletionCreateParams,
-  ): Promise<ChatCompletion | AsyncIterable<ChatCompletionChunk>> {
-    const { signal: fetchSignal, cleanup } = buildSignal(params);
-    const payload = stripRequestOptions(params);
-
-    const response = await safeFetch(
-      `${this.baseURL}/chat/completions`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify(payload),
-        signal: fetchSignal,
-      },
-    );
-
-    await throwIfNotOk(response);
-
-    if (params.stream) {
-      return this.streamCompletions(response, cleanup);
-    }
-
-    cleanup();
-    return response.json() as Promise<ChatCompletion>;
-  }
-
-  private async *streamCompletions(
-    response: Response,
-    cleanup: () => void,
-  ): AsyncIterable<ChatCompletionChunk> {
-    if (!response.body) {
-      cleanup();
-      throw new Error('DEVUP_API_ERROR: Response body is missing');
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmedLine = line.trim();
-          if (trimmedLine.startsWith('data: ')) {
-            const data = trimmedLine.slice(6).trim();
-            if (data === '[DONE]') return;
-            if (!data) continue;
-
-            try {
-              yield JSON.parse(data) as ChatCompletionChunk;
-            } catch (e) {
-              // Ignore invalid JSON chunks
+    create(params: ChatCompletionCreateParams & { stream: true } & RequestOptions): Promise<AsyncIterable<ChatCompletionChunk>>;
+    create(params: ChatCompletionCreateParams & { stream?: false } & RequestOptions): Promise<ChatCompletion>;
+    async create(params: ChatCompletionCreateParams & RequestOptions): Promise<ChatCompletion | AsyncIterable<ChatCompletionChunk>> {
+        const { signal, cleanup } = buildSignal(params);
+        try {
+            const payload = stripRequestOptions(params);
+            const response = await safeFetch(`${this.baseURL}/chat/completions`, {
+                method: "POST",
+                headers: buildJsonHeaders(this.apiKey, this.defaultHeaders, params.headers),
+                body: JSON.stringify(payload),
+                signal
+            });
+            await throwIfNotOk(response);
+            if (params.stream) {
+                // Ownership transferred
+                return this.streamCompletions(response, cleanup);
             }
-          }
+            const data = await response.json();
+            cleanup();
+            return data as ChatCompletion;
+        } catch (e) {
+            cleanup();
+            throw e;
         }
-      }
-    } finally {
-      cleanup();
-      reader.releaseLock();
     }
-  }
-}
 
-// ─── Chat ─────────────────────────────────────────────────────────────────────
+    private async *streamCompletions(response: Response, cleanup: () => void): AsyncIterable<ChatCompletionChunk> {
+        if (!response.body) {
+            cleanup();
+            throw new Error("DEVUP_API_ERROR: Response body is missing");
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine.startsWith("data: ")) {
+                        const data = trimmedLine.slice(6).trim();
+                        if (data === "[DONE]") return;
+                        if (!data) continue;
+                        try {
+                            yield JSON.parse(data);
+                        } catch (_e: any) {
+                            // Ignore malformed JSON
+                        }
+                    }
+                }
+            }
+        } finally {
+            cleanup();
+            reader.releaseLock();
+        }
+    }
+}
 
 class Chat {
-  public completions: Completions;
-
-  constructor(apiKey: string, baseURL: string) {
-    this.completions = new Completions(apiKey, baseURL);
-  }
+    completions: Completions;
+    constructor(apiKey: string, baseURL: string, defaultHeaders?: Record<string, string>) {
+        this.completions = new Completions(apiKey, baseURL, defaultHeaders);
+    }
 }
-
-// ─── Models ───────────────────────────────────────────────────────────────────
 
 class Models {
-  private apiKey: string;
-  private baseURL: string;
-
-  constructor(apiKey: string, baseURL: string) {
-    this.apiKey = apiKey;
-    this.baseURL = baseURL;
-  }
-
-  /**
-   * Lists all available models.
-   *
-   * @param options - Optional request options (signal, timeout).
-   * @returns An OpenAI-compatible model list response.
-   *
-   * @example
-   * ```typescript
-   * const models = await client.models.list();
-   * for (const model of models.data) {
-   *   console.log(model.id, model.owned_by);
-   * }
-   * ```
-   */
-  async list(options: RequestOptions = {}): Promise<ModelListResponse> {
-    const { signal: fetchSignal, cleanup } = buildSignal(options);
-
-    try {
-      const response = await safeFetch(`${this.baseURL}/models`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        signal: fetchSignal,
-      });
-
-      await throwIfNotOk(response);
-      return response.json() as Promise<ModelListResponse>;
-    } finally {
-      cleanup();
+    constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    async list(options: RequestOptions = {}): Promise<ModelListResponse> {
+        const { signal, cleanup } = buildSignal(options);
+        try {
+            const response = await safeFetch(`${this.baseURL}/models`, {
+                method: "GET",
+                headers: buildPublicHeaders(this.defaultHeaders, options.headers),
+                signal
+            });
+            await throwIfNotOk(response);
+            return response.json();
+        } finally {
+            cleanup();
+        }
     }
-  }
 }
-
-// ─── Images ───────────────────────────────────────────────────────────────────
 
 class Images {
-  private apiKey: string;
-  private baseURL: string;
-
-  constructor(apiKey: string, baseURL: string) {
-    this.apiKey = apiKey;
-    this.baseURL = baseURL;
-  }
-
-  /**
-   * Generates images from a text prompt.
-   *
-   * @param params - Image generation parameters.
-   * @returns An array of generated image URLs or base64 data.
-   *
-   * @example
-   * ```typescript
-   * const result = await client.images.generate({
-   *   model: "devup-image-v1",
-   *   prompt: "A sunset over mountains",
-   *   size: "1024x1024",
-   * });
-   * console.log(result.data[0].url);
-   * ```
-   */
-  async generate(params: ImageGenerateParams): Promise<ImageGenerateResponse> {
-    const { signal: fetchSignal, cleanup } = buildSignal(params);
-    const payload = stripRequestOptions(params);
-
-    try {
-      const response = await safeFetch(
-        `${this.baseURL}/images/generations`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.apiKey}`,
-          },
-          body: JSON.stringify(payload),
-          signal: fetchSignal,
-        },
-      );
-
-      await throwIfNotOk(response);
-      return response.json() as Promise<ImageGenerateResponse>;
-    } finally {
-      cleanup();
+    constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    async generate(params: ImageGenerateParams & RequestOptions): Promise<ImageGenerateResponse> {
+        const { signal, cleanup } = buildSignal(params);
+        try {
+            const response = await safeFetch(`${this.baseURL}/images/generations`, {
+                method: "POST",
+                headers: buildJsonHeaders(this.apiKey, this.defaultHeaders, params.headers),
+                body: JSON.stringify(stripRequestOptions(params)),
+                signal
+            });
+            await throwIfNotOk(response);
+            return response.json();
+        } finally {
+            cleanup();
+        }
     }
-  }
-}
 
-// ─── Embeddings ───────────────────────────────────────────────────────────────
+    async edit(params: ImageEditParams & RequestOptions): Promise<ImageGenerateResponse> {
+        const { signal, cleanup } = buildSignal(params);
+        const formData = new FormData();
+        const image = params.image as any;
+        formData.append("image", image instanceof Uint8Array ? new Blob([image as any]) : image);
+        const mask = params.mask as any;
+        if (mask) {
+            formData.append("mask", mask instanceof Uint8Array ? new Blob([mask as any]) : mask);
+        }
+        if (params.prompt) formData.append("prompt", params.prompt);
+        if (params.model) if (params.model !== undefined) {
+            formData.append("model", params.model);
+        }
+        if (params.n !== undefined) formData.append("n", params.n.toString());
+        if (params.size) formData.append("size", params.size);
+
+        try {
+            const response = await safeFetch(`${this.baseURL}/images/generations`, {
+                method: "POST",
+                headers: buildMultipartHeaders(this.apiKey, this.defaultHeaders, params.headers),
+                body: formData,
+                signal
+            });
+            await throwIfNotOk(response);
+            return response.json();
+        } finally {
+            cleanup();
+        }
+    }
+
+    async proxy(params: { url: string } & RequestOptions): Promise<Response> {
+        const { signal, cleanup } = buildSignal(params);
+        try {
+            const proxyURL = new URL(`${this.baseURL}/images/proxy`);
+            proxyURL.searchParams.set("url", params.url);
+            const response = await safeFetch(proxyURL.toString(), {
+                method: "GET",
+                headers: buildPublicHeaders(this.defaultHeaders, params.headers),
+                signal
+            });
+            await throwIfNotOk(response);
+            return response;
+        } finally {
+            cleanup();
+        }
+    }
+}
 
 class Embeddings {
-  private apiKey: string;
-  private baseURL: string;
-
-  constructor(apiKey: string, baseURL: string) {
-    this.apiKey = apiKey;
-    this.baseURL = baseURL;
-  }
-
-  /**
-   * Creates embedding vectors from input text.
-   *
-   * @param params - Embedding parameters.
-   * @returns An OpenAI-compatible embedding response.
-   *
-   * @example
-   * ```typescript
-   * const result = await client.embeddings.create({
-   *   model: "devup-embed-v1",
-   *   input: ["Hello world", "How are you?"],
-   * });
-   * console.log(result.data[0].embedding);
-   * ```
-   */
-  async create(
-    params: EmbeddingCreateParams,
-  ): Promise<EmbeddingCreateResponse> {
-    const { signal: fetchSignal, cleanup } = buildSignal(params);
-    const payload = stripRequestOptions(params);
-
-    try {
-      const response = await safeFetch(`${this.baseURL}/embeddings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify(payload),
-        signal: fetchSignal,
-      });
-
-      await throwIfNotOk(response);
-      return response.json() as Promise<EmbeddingCreateResponse>;
-    } finally {
-      cleanup();
+    constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    async create(params: EmbeddingCreateParams & RequestOptions): Promise<EmbeddingCreateResponse> {
+        const { signal, cleanup } = buildSignal(params);
+        try {
+            const response = await safeFetch(`${this.baseURL}/embeddings`, {
+                method: "POST",
+                headers: buildJsonHeaders(this.apiKey, this.defaultHeaders, params.headers),
+                body: JSON.stringify(stripRequestOptions(params)),
+                signal
+            });
+            await throwIfNotOk(response);
+            return response.json();
+        } finally {
+            cleanup();
+        }
     }
-  }
 }
 
-// ─── Audio: Speech (TTS) ─────────────────────────────────────────────────────
-
-class Speech {
-  private apiKey: string;
-  private baseURL: string;
-
-  constructor(apiKey: string, baseURL: string) {
-    this.apiKey = apiKey;
-    this.baseURL = baseURL;
-  }
-
-  /**
-   * Generates speech audio from text.
-   *
-   * @param params - Speech synthesis parameters.
-   * @returns Raw audio bytes as an ArrayBuffer.
-   *
-   * @example
-   * ```typescript
-   * const audioBuffer = await client.audio.speech.create({
-   *   model: "devup-tts-v1",
-   *   input: "Welcome to DEVUP AI!",
-   *   voice: "alloy",
-   *   response_format: "mp3",
-   * });
-   * // In Node.js: writeFileSync("speech.mp3", new Uint8Array(audioBuffer));
-   * ```
-   */
-  async create(params: SpeechCreateParams): Promise<ArrayBuffer> {
-    const { signal: fetchSignal, cleanup } = buildSignal(params);
-    const payload = stripRequestOptions(params);
-
-    try {
-      const response = await safeFetch(`${this.baseURL}/audio/speech`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify(payload),
-        signal: fetchSignal,
-      });
-
-      await throwIfNotOk(response);
-      return response.arrayBuffer();
-    } finally {
-      cleanup();
+class AudioSpeech {
+    constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    async create(params: SpeechCreateParams & RequestOptions): Promise<SpeechResponse> {
+        const { signal, cleanup } = buildSignal(params);
+        try {
+            const response = await safeFetch(`${this.baseURL}/audio/speech`, {
+                method: "POST",
+                headers: buildJsonHeaders(this.apiKey, this.defaultHeaders, params.headers),
+                body: JSON.stringify(stripRequestOptions(params)),
+                signal
+            });
+            await throwIfNotOk(response);
+            return response.json();
+        } finally {
+            cleanup();
+        }
     }
-  }
 }
 
-// ─── Audio: Transcriptions (ASR) ─────────────────────────────────────────────
+class AudioTranscriptions {
+    constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
 
-class Transcriptions {
-  private apiKey: string;
-  private baseURL: string;
+    create(params: TranscriptionCreateParams & { response_format: 'text' | 'srt' | 'vtt' } & RequestOptions): Promise<string>;
+    create(params: TranscriptionCreateParams & { response_format: 'verbose_json' } & RequestOptions): Promise<TranscriptionVerboseResponse>;
+    create(params: TranscriptionCreateParams & { response_format?: 'json' } & RequestOptions): Promise<TranscriptionResponse>;
+    async create(params: TranscriptionCreateParams & RequestOptions): Promise<TranscriptionResponse | TranscriptionVerboseResponse | string> {
+        const { signal, cleanup } = buildSignal(params);
+        const formData = new FormData();
+        const file = params.file as any;
+        formData.append("file", file instanceof Uint8Array ? new Blob([file as any]) : file);
+        if (params.model !== undefined) {
+            formData.append("model", params.model);
+        }
+        if (params.language) formData.append("language", params.language);
+        if (params.response_format) formData.append("response_format", params.response_format);
 
-  constructor(apiKey: string, baseURL: string) {
-    this.apiKey = apiKey;
-    this.baseURL = baseURL;
-  }
-
-  /**
-   * Transcribes audio to text.
-   *
-   * @param params - Transcription parameters including the audio file.
-   * @returns The transcription result.
-   *
-   * @example
-   * ```typescript
-   * const result = await client.audio.transcriptions.create({
-   *   model: "devup-whisper-v1",
-   *   file: audioBlob,
-   *   language: "en",
-   * });
-   * console.log(result.text);
-   * ```
-   */
-  async create(
-    params: TranscriptionCreateParams,
-  ): Promise<TranscriptionResponse> {
-    const { signal: fetchSignal, cleanup } = buildSignal(params);
-
-    const formData = new FormData();
-
-    // Handle Uint8Array by wrapping in a Blob
-    if (params.file instanceof Uint8Array) {
-      formData.append('file', new Blob([params.file as BlobPart]));
-    } else {
-      formData.append('file', params.file as Blob);
+        try {
+            const response = await safeFetch(`${this.baseURL}/audio/transcriptions`, {
+                method: "POST",
+                headers: buildMultipartHeaders(this.apiKey, this.defaultHeaders, params.headers),
+                body: formData,
+                signal
+            });
+            await throwIfNotOk(response);
+            if (params.response_format === "text" || params.response_format === "srt" || params.response_format === "vtt") {
+                return response.text();
+            }
+            return response.json();
+        } finally {
+            cleanup();
+        }
     }
-
-    formData.append('model', params.model);
-
-    if (params.language !== undefined)
-      formData.append('language', params.language);
-    if (params.prompt !== undefined) formData.append('prompt', params.prompt);
-    if (params.response_format !== undefined)
-      formData.append('response_format', params.response_format);
-
-    try {
-      const response = await safeFetch(
-        `${this.baseURL}/audio/transcriptions`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-            // Content-Type intentionally omitted — runtime sets multipart boundary
-          },
-          body: formData,
-          signal: fetchSignal,
-        },
-      );
-
-      await throwIfNotOk(response);
-      return response.json() as Promise<TranscriptionResponse>;
-    } finally {
-      cleanup();
-    }
-  }
 }
-
-// ─── Video: Generations ───────────────────────────────────────────────────────
 
 class VideoGenerations {
-  private apiKey: string;
-  private baseURL: string;
-
-  constructor(apiKey: string, baseURL: string) {
-    this.apiKey = apiKey;
-    this.baseURL = baseURL;
-  }
-
-  /**
-   * Generates video from a text prompt.
-   *
-   * @param params - Video generation parameters.
-   * @returns An array of generated video URLs.
-   *
-   * @example
-   * ```typescript
-   * const result = await client.video.generations.create({
-   *   model: "devup-video-v1",
-   *   prompt: "A cat playing piano",
-   * });
-   * console.log(result.data[0].url);
-   * ```
-   */
-  async create(
-    params: VideoGenerationCreateParams,
-  ): Promise<VideoGenerationResponse> {
-    const { signal: fetchSignal, cleanup } = buildSignal(params);
-    const payload = stripRequestOptions(params);
-
-    try {
-      const response = await safeFetch(
-        `${this.baseURL}/video/generations`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.apiKey}`,
-          },
-          body: JSON.stringify(payload),
-          signal: fetchSignal,
-        },
-      );
-
-      await throwIfNotOk(response);
-      return response.json() as Promise<VideoGenerationResponse>;
-    } finally {
-      cleanup();
+    constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    async create(params: VideoGenerationCreateParams & RequestOptions): Promise<VideoGenerationResponse> {
+        const { signal, cleanup } = buildSignal(params);
+        try {
+            const response = await safeFetch(`${this.baseURL}/video/generations`, {
+                method: "POST",
+                headers: buildJsonHeaders(this.apiKey, this.defaultHeaders, params.headers),
+                body: JSON.stringify(stripRequestOptions(params)),
+                signal
+            });
+            await throwIfNotOk(response);
+            return response.json();
+        } finally {
+            cleanup();
+        }
     }
-  }
 }
 
-// ─── Reranking ────────────────────────────────────────────────────────────────
+class VideoEdits {
+    constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    async create(params: VideoEditCreateParams & RequestOptions): Promise<VideoGenerationResponse> {
+        const { signal, cleanup } = buildSignal(params);
+        const formData = new FormData();
+        const video = params.video;
+        formData.append("video", video instanceof Uint8Array ? new Blob([video as BlobPart]) : video);
 
-class Reranking {
-  private apiKey: string;
-  private baseURL: string;
+        if (params.model !== undefined) if (params.model !== undefined) {
+            formData.append("model", params.model);
+        }
+        if (params.prompt !== undefined) formData.append("prompt", params.prompt);
 
-  constructor(apiKey: string, baseURL: string) {
-    this.apiKey = apiKey;
-    this.baseURL = baseURL;
-  }
+        const mask = params.mask;
+        if (mask !== undefined) {
+            formData.append("mask", mask instanceof Uint8Array ? new Blob([mask as BlobPart]) : mask);
+        }
 
-  /**
-   * Reranks documents by relevance to a query.
-   *
-   * @param params - Reranking parameters.
-   * @returns Ranked results with relevance scores.
-   *
-   * @example
-   * ```typescript
-   * const result = await client.reranking.create({
-   *   model: "devup-rerank-v1",
-   *   query: "What is machine learning?",
-   *   documents: [
-   *     "ML is a subset of AI...",
-   *     "The weather is sunny...",
-   *   ],
-   *   top_n: 1,
-   * });
-   * console.log(result.results[0].relevance_score);
-   * ```
-   */
-  async create(
-    params: RerankingCreateParams,
-  ): Promise<RerankingCreateResponse> {
-    const { signal: fetchSignal, cleanup } = buildSignal(params);
-    const payload = stripRequestOptions(params);
+        if (params.mask_url !== undefined) formData.append("mask_url", params.mask_url);
+        if (params.key_points !== undefined) {
+            const kp = typeof params.key_points === 'string' ? params.key_points : JSON.stringify(params.key_points);
+            formData.append("key_points", kp);
+        }
+        if (params.frame_index !== undefined) formData.append("frame_index", params.frame_index.toString());
+        if (params.auto_trim !== undefined) formData.append("auto_trim", params.auto_trim.toString());
+        if (params.preserve_audio !== undefined) formData.append("preserve_audio", params.preserve_audio.toString());
+        if (params.background_color !== undefined) formData.append("background_color", params.background_color);
+        if (params.desired_increase !== undefined) formData.append("desired_increase", params.desired_increase.toString());
+        if (params.output_container_and_codec !== undefined) formData.append("output_container_and_codec", params.output_container_and_codec);
 
-    try {
-      const response = await safeFetch(`${this.baseURL}/reranking`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify(payload),
-        signal: fetchSignal,
-      });
-
-      await throwIfNotOk(response);
-      return response.json() as Promise<RerankingCreateResponse>;
-    } finally {
-      cleanup();
+        try {
+            const response = await safeFetch(`${this.baseURL}/video/generations`, {
+                method: "POST",
+                headers: buildMultipartHeaders(this.apiKey, this.defaultHeaders, params.headers),
+                body: formData,
+                signal
+            });
+            await throwIfNotOk(response);
+            return response.json();
+        } finally {
+            cleanup();
+        }
     }
-  }
 }
 
-// ─── DevupAI Client ───────────────────────────────────────────────────────────
+class NativeInference {
+    constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    async run<TResponse = unknown, TPayload extends Record<string, unknown> = Record<string, unknown>>(modelPath: string, payload: TPayload, options: RequestOptions = {}): Promise<TResponse> {
+        const { signal, cleanup } = buildSignal(options);
+        try {
+            const cleanPath = modelPath.replace(/^\/+/, '');
+            // Only encode if not already encoded, or simply encode parts?
+            // Actually, percent encode the whole model path, but prevent double encoding.
+            // A simple decode->encode guarantees it's encoded exactly once.
+            let encodedPath = cleanPath;
+            try {
+                encodedPath = encodeURIComponent(decodeURIComponent(cleanPath));
+            } catch (_e) {
+                encodedPath = encodeURIComponent(cleanPath);
+            }
 
-/**
- * The main DEVUP AI client.
- *
- * Provides access to all DEVUP AI API endpoints through a resource-based interface.
- *
- * @example
- * ```typescript
- * import DevupAI from "devupai";
- *
- * const client = new DevupAI({ apiKey: "dvup_..." });
- *
- * // Chat
- * const chat = await client.chat.completions.create({
- *   model: "devup-fast-v1",
- *   messages: [{ role: "user", content: "Hello!" }],
- * });
- *
- * // Streaming
- * const stream = await client.chat.completions.create({
- *   model: "devup-fast-v1",
- *   messages: [{ role: "user", content: "Tell me a story" }],
- *   stream: true,
- * });
- * for await (const chunk of stream) {
- *   process.stdout.write(chunk.choices[0]?.delta?.content || "");
- * }
- *
- * // Images
- * const image = await client.images.generate({
- *   model: "devup-image-v1",
- *   prompt: "A sunset over mountains",
- * });
- *
- * // Embeddings
- * const embeddings = await client.embeddings.create({
- *   model: "devup-embed-v1",
- *   input: "Hello world",
- * });
- *
- * // Models
- * const models = await client.models.list();
- * ```
- */
-export default class DevupAI {
-  /** Chat completions resource. */
-  public chat: Chat;
+            const response = await safeFetch(`${this.baseURL}/inference/${encodedPath}`, {
+                method: "POST",
+                headers: buildJsonHeaders(this.apiKey, this.defaultHeaders, options.headers),
+                body: JSON.stringify(payload),
+                signal
+            });
+            await throwIfNotOk(response);
+            return response.json();
+        } finally {
+            cleanup();
+        }
+    }
+}
 
-  /** Available models resource. */
-  public models: Models;
+class Balance {
+    constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    async retrieve(options: RequestOptions = {}): Promise<BalanceResponse> {
+        const { signal, cleanup } = buildSignal(options);
+        try {
+            const response = await safeFetch(`${this.baseURL}/user/balance`, {
+                method: "GET",
+                headers: buildAuthHeaders(this.apiKey, this.defaultHeaders, options.headers),
+                signal
+            });
+            await throwIfNotOk(response);
+            return response.json();
+        } finally {
+            cleanup();
+        }
+    }
+}
 
-  /** Image generation resource. */
-  public images: Images;
+class Health {
+    constructor(private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    async check(options: RequestOptions = {}): Promise<HealthResponse> {
+        const { signal, cleanup } = buildSignal(options);
+        try {
+            const url = new URL('../health', this.baseURL.endsWith('/') ? this.baseURL : this.baseURL + '/').toString();
+            const response = await safeFetch(url, {
+                method: "GET",
+                headers: buildPublicHeaders(this.defaultHeaders, options.headers),
+                signal
+            });
+            await throwIfNotOk(response);
+            return response.json();
+        } finally {
+            cleanup();
+        }
+    }
+}
 
-  /** Text embeddings resource. */
-  public embeddings: Embeddings;
-
-  /** Audio resources (speech synthesis and transcription). */
-  public audio: { speech: Speech; transcriptions: Transcriptions };
-
-  /** Video generation resource. */
-  public video: { generations: VideoGenerations };
-
-  /** Document reranking resource. */
-  public reranking: Reranking;
-
-  constructor(options: DevUpAIOptions) {
-    const baseURL = options.baseURL || 'https://api.devupai.com/v1';
-    const apiKey = options.apiKey;
-
-    this.chat = new Chat(apiKey, baseURL);
-    this.models = new Models(apiKey, baseURL);
-    this.images = new Images(apiKey, baseURL);
-    this.embeddings = new Embeddings(apiKey, baseURL);
-    this.audio = {
-      speech: new Speech(apiKey, baseURL),
-      transcriptions: new Transcriptions(apiKey, baseURL),
+class DevupAI {
+    baseURL: string;
+    chat: Chat;
+    models: Models;
+    images: Images;
+    embeddings: Embeddings;
+    audio: {
+        speech: AudioSpeech;
+        transcriptions: AudioTranscriptions;
     };
-    this.video = { generations: new VideoGenerations(apiKey, baseURL) };
-    this.reranking = new Reranking(apiKey, baseURL);
-  }
+    video: {
+        generations: VideoGenerations;
+        edits: VideoEdits;
+    };
+    inference: NativeInference;
+    balance: Balance;
+    health: Health;
+
+    constructor(options: DevUpAIOptions) {
+        const baseURL = (options.baseURL || "https://api.devupai.com/api/v1").replace(/\/+$/, "");
+        this.baseURL = baseURL;
+        const apiKey = options.apiKey;
+        const defaultHeaders = options.headers;
+        this.chat = new Chat(apiKey, baseURL, defaultHeaders);
+        this.models = new Models(apiKey, baseURL, defaultHeaders);
+        this.images = new Images(apiKey, baseURL, defaultHeaders);
+        this.embeddings = new Embeddings(apiKey, baseURL, defaultHeaders);
+        this.audio = {
+            speech: new AudioSpeech(apiKey, baseURL, defaultHeaders),
+            transcriptions: new AudioTranscriptions(apiKey, baseURL, defaultHeaders)
+        };
+        this.video = {
+            generations: new VideoGenerations(apiKey, baseURL, defaultHeaders),
+            edits: new VideoEdits(apiKey, baseURL, defaultHeaders)
+        };
+        this.inference = new NativeInference(apiKey, baseURL, defaultHeaders);
+        this.balance = new Balance(apiKey, baseURL, defaultHeaders);
+        this.health = new Health(baseURL, defaultHeaders);
+    }
 }
+
+export default DevupAI;

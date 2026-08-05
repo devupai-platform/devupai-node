@@ -1,3 +1,6 @@
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import { LanguageModelV3, EmbeddingModelV3, ImageModelV3 } from '@ai-sdk/provider';
+
 /**
  * DEVUP AI — Vercel AI SDK Provider
  *
@@ -5,10 +8,10 @@
  *
  * @example
  * ```typescript
- * import { createDevupAI } from "devupai";
+ * import { createDevupAI } from "devupai/ai";
  * import { streamText } from "ai";
  *
- * const devupai = createDevupAI({ apiKey: "dvup_..." });
+ * const devupai = createDevupAI({ apiKey: "sk-devup-..." });
  * const result = await streamText({
  *   model: devupai("devup-fast-v1"),
  *   prompt: "Hello!",
@@ -18,36 +21,24 @@
  * @module
  */
 
-import type {
-  LanguageModelV3,
-  EmbeddingModelV3,
-  ImageModelV3,
-} from '@ai-sdk/provider';
-import {
-  createOpenAICompatible,
-  type OpenAICompatibleProvider,
-} from '@ai-sdk/openai-compatible';
-
-
 /**
  * Configuration options for the DEVUP AI Vercel AI SDK provider.
  */
+
 export interface DevupAIProviderSettings {
-  /**
-   * Your DEVUP AI API key. Required — obtain from https://devupai.com/dashboard/api-keys
-   */
-  apiKey?: string;
-
-  /**
-   * Base URL for the DEVUP AI API.
-   * @default "https://api.devupai.com/v1"
-   */
-  baseURL?: string;
-
-  /**
-   * Custom headers to include in every request.
-   */
-  headers?: Record<string, string>;
+    /**
+     * Your DEVUP AI API key. Required — obtain from https://devupai.com/dashboard/api-keys
+     */
+    apiKey?: string;
+    /**
+     * Base URL for the DEVUP AI API.
+     * @default "https://api.devupai.com/api/v1"
+     */
+    baseURL?: string;
+    /**
+     * Custom headers to include in every request.
+     */
+    headers?: Record<string, string>;
 }
 
 /**
@@ -58,43 +49,37 @@ export interface DevupAIProviderSettings {
  * const model = devupai("devup-fast-v1");
  * ```
  */
-export interface DevupAIProvider
-  extends OpenAICompatibleProvider<string, string, string, string> {
-  /**
-   * Creates a language model for text generation.
-   * @param modelId - The DEVUP AI model identifier.
-   */
-  (modelId: string): LanguageModelV3;
-
-  /**
-   * Creates a chat model for text generation.
-   * @param modelId - The DEVUP AI model identifier.
-   */
-  chatModel(modelId: string): LanguageModelV3;
-
-  /**
-   * Creates a language model for text generation.
-   * @param modelId - The DEVUP AI model identifier.
-   */
-  languageModel(modelId: string): LanguageModelV3;
-
-  /**
-   * Creates a completion model for text generation.
-   * @param modelId - The DEVUP AI model identifier.
-   */
-  completionModel(modelId: string): LanguageModelV3;
-
-  /**
-   * Creates an embedding model for text embeddings.
-   * @param modelId - The DEVUP AI embedding model identifier.
-   */
-  embeddingModel(modelId: string): EmbeddingModelV3;
-
-  /**
-   * Creates an image model for image generation.
-   * @param modelId - The DEVUP AI image model identifier.
-   */
-  imageModel(modelId: string): ImageModelV3;
+export interface DevupAIProvider {
+    /**
+     * Creates a language model for text generation.
+     * @param modelId - The DEVUP AI model identifier.
+     */
+    (modelId: string): LanguageModelV3;
+    /**
+     * Creates a chat model for text generation.
+     * @param modelId - The DEVUP AI model identifier.
+     */
+    chatModel(modelId: string): LanguageModelV3;
+    /**
+     * Creates a language model for text generation.
+     * @param modelId - The DEVUP AI model identifier.
+     */
+    languageModel(modelId: string): LanguageModelV3;
+    /**
+     * Creates a completion model for text generation.
+     * @param modelId - The DEVUP AI model identifier.
+     */
+    completionModel(modelId: string): LanguageModelV3;
+    /**
+     * Creates an embedding model for text embeddings.
+     * @param modelId - The DEVUP AI embedding model identifier.
+     */
+    embeddingModel(modelId: string): EmbeddingModelV3;
+    /**
+     * Creates an image model for image generation.
+     * @param modelId - The DEVUP AI image model identifier.
+     */
+    imageModel(modelId: string): ImageModelV3;
 }
 
 /**
@@ -105,10 +90,10 @@ export interface DevupAIProvider
  *
  * @example
  * ```typescript
- * import { createDevupAI } from "devupai";
+ * import { createDevupAI } from "devupai/ai";
  * import { generateText, streamText, embed } from "ai";
  *
- * const devupai = createDevupAI({ apiKey: "dvup_..." });
+ * const devupai = createDevupAI({ apiKey: "sk-devup-..." });
  *
  * // Text generation
  * const { text } = await generateText({
@@ -129,20 +114,17 @@ export interface DevupAIProvider
  * });
  * ```
  */
-export function createDevupAI(
-  options: DevupAIProviderSettings = {},
-): DevupAIProvider {
-  const baseURL = (options.baseURL ?? 'https://api.devupai.com/v1').replace(
+export function createDevupAI(options: DevupAIProviderSettings = {}): DevupAIProvider {
+  const baseURL = (options.baseURL ?? "https://api.devupai.com/api/v1").replace(
     /\/+$/,
-    '',
+    ""
   );
-
   return createOpenAICompatible({
     baseURL,
-    name: 'devupai',
-    apiKey: options.apiKey ?? process.env.DEVUP_API_KEY ?? process.env.DEVUPAI_API_KEY,
-    headers: options.headers,
-  }) as DevupAIProvider;
+    name: "devupai",
+    apiKey: options.apiKey ?? (typeof process !== 'undefined' ? (process.env.DEVUP_API_KEY ?? process.env.DEVUPAI_API_KEY) : undefined),
+    headers: options.headers
+  }) as unknown as DevupAIProvider;
 }
 
 /**
@@ -150,7 +132,7 @@ export function createDevupAI(
  *
  * @example
  * ```typescript
- * import { devupai } from "devupai";
+ * import { devupai } from "devupai/ai";
  * import { generateText } from "ai";
  *
  * const { text } = await generateText({
@@ -159,4 +141,4 @@ export function createDevupAI(
  * });
  * ```
  */
-export const devupai = createDevupAI();
+export const devupai: DevupAIProvider = createDevupAI();
