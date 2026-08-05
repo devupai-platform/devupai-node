@@ -8,7 +8,7 @@
   </a>
 </p>
 
-<h1 align="center">DEVUP AI â€” Official Node.js SDK</h1>
+<h1 align="center">DEVUP AI — Official Node.js SDK</h1>
 
 <p align="center">
   <strong>Build with leading AI models. Pay in Algerian Dinar.</strong>
@@ -36,15 +36,15 @@
 
 <p align="center">
   <a href="https://docs.devupai.com/"><strong>Documentation</strong></a>
-  آ·
+  ·
   <a href="https://devupai.com/dashboard"><strong>Dashboard</strong></a>
-  آ·
+  ·
   <a href="https://devupai.com/dashboard/api-keys"><strong>API Keys</strong></a>
-  آ·
+  ·
   <a href="https://devupai.com/models"><strong>Models</strong></a>
-  آ·
+  ·
   <a href="https://status.devupai.com/"><strong>Status</strong></a>
-  آ·
+  ·
   <a href="https://www.npmjs.com/package/devupai"><strong>npm</strong></a>
 </p>
 
@@ -67,7 +67,7 @@ It gives you one consistent interface for:
 - Model discovery, account balance, and health operations
 - Vercel AI SDK integrations
 
-> **Core client:** zero runtime dependencies.
+> **Core client:** zero runtime dependencies.  
 > **Vercel AI SDK provider:** available through the optional `devupai/ai` export.
 
 ## Contents
@@ -322,7 +322,7 @@ const client = new DevupAI({
 async function createEmbeddings() {
   const response = await client.embeddings.create({
     model: "BAAI/bge-m3",
-    input: ["Hello world", "ظ…ط±ط­ط¨ط§ ط¨ط§ظ„ط¹ط§ظ„ظ…", "Bonjour le monde"],
+    input: ["Hello world", "مرحبا بالعالم", "Bonjour le monde"],
   });
 
   console.log(response.data[0]?.embedding);
@@ -676,9 +676,9 @@ const client = new DevupAI({
 
 | Option    | Type                     | Required | Default                          | Description                                 |
 | --------- | ------------------------ | -------: | -------------------------------- | ------------------------------------------- |
-| `apiKey`  | `string`                 |      Yes | â€”                                | Your DEVUP AI API key.                      |
+| `apiKey`  | `string`                 |      Yes | —                                | Your DEVUP AI API key.                      |
 | `baseURL` | `string`                 |       No | `https://api.devupai.com/api/v1` | DEVUP AI API base URL.                      |
-| `headers` | `Record<string, string>` |       No | â€”                                | Custom headers included in client requests. |
+| `headers` | `Record<string, string>` |       No | —                                | Custom headers included in client requests. |
 
 Protected authentication and content-type headers are managed by the SDK.
 
@@ -851,7 +851,7 @@ Model availability may evolve over time. The live catalog is the source of
 truth:
 
 <p align="center">
-  <a href="https://devupai.com/models"><strong>Browse available models â†’</strong></a>
+  <a href="https://devupai.com/models"><strong>Browse available models →</strong></a>
 </p>
 
 ---
@@ -895,8 +895,8 @@ The DEVUP AI Node.js SDK is released under the
 
 <p align="center">
   <a href="https://devupai.com">Website</a>
-  آ·
+  ·
   <a href="https://docs.devupai.com/">Documentation</a>
-  آ·
+  ·
   <a href="https://www.npmjs.com/package/devupai">npm</a>
 </p>
