@@ -487,17 +487,17 @@ const client = new DevupAI({
   apiKey: process.env.DEVUP_API_KEY!,
 });
 
+```typescript
 async function rerankDocuments() {
-  const response = await client.inference.run<RerankResponse>(
-    "example-org/example-reranker-model",
-    {
-      query: "What is DEVUP AI?",
-      documents: [
-        "DEVUP AI is an AI inference gateway.",
-        "Algiers is the capital of Algeria.",
-      ],
-    },
-  );
+  const response = await client.rerank.create({
+    model: "Qwen/Qwen3-Reranker-8B",
+    query: "What is DEVUP AI?",
+    documents: [
+      "DEVUP AI is an AI inference gateway.",
+      "Algiers is the capital of Algeria.",
+    ],
+    top_n: 1,
+  });
 
   console.log(response.results);
 }

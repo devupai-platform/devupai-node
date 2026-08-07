@@ -93,6 +93,9 @@ export type EmbeddingCreateParams = Omit<components['schemas']['EmbeddingRequest
 };
 export type EmbeddingCreateResponse = components['schemas']['EmbeddingResponse'];
 
+export type RerankCreateParams = components['schemas']['RerankRequest'];
+export type RerankCreateResponse = components['schemas']['RerankResponse'];
+
 export type SpeechCreateParams = Omit<components['schemas']['SpeechRequest'], 'voice' | 'response_format'> & {
     voice?: string;
     response_format?: "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm";
@@ -276,11 +279,13 @@ async function throwIfNotOk(response: Response): Promise<void> {
     );
 }
 
+/** Chat completions resource. */
 class Completions {
 
 
     constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
 
+    /** Creates a model response for the given chat conversation. */
     create(params: ChatCompletionCreateParams & { stream: true } & RequestOptions): Promise<AsyncIterable<ChatCompletionChunk>>;
     create(params: ChatCompletionCreateParams & { stream?: false } & RequestOptions): Promise<ChatCompletion>;
     async create(params: ChatCompletionCreateParams & RequestOptions): Promise<ChatCompletion | AsyncIterable<ChatCompletionChunk>> {
@@ -343,6 +348,7 @@ class Completions {
     }
 }
 
+/** Chat resource. */
 class Chat {
     completions: Completions;
     constructor(apiKey: string, baseURL: string, defaultHeaders?: Record<string, string>) {
@@ -350,8 +356,10 @@ class Chat {
     }
 }
 
+/** Available models resource. */
 class Models {
     constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    /** Lists the currently available models. */
     async list(options: RequestOptions = {}): Promise<ModelListResponse> {
         const { signal, cleanup } = buildSignal(options);
         try {
@@ -368,8 +376,14 @@ class Models {
     }
 }
 
+/** 
+ * Image generation and editing resource.
+ * Note: Intentionally using `generate()` and `edit()` instead of the nested `generations.create()`
+ * pattern to avoid a breaking major-version change in v3.
+ */
 class Images {
     constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    /** Creates an image given a prompt. */
     async generate(params: ImageGenerateParams & RequestOptions): Promise<ImageGenerateResponse> {
         const { signal, cleanup } = buildSignal(params);
         try {
@@ -386,6 +400,7 @@ class Images {
         }
     }
 
+    /** Creates an edited or extended image given an original image and a prompt. */
     async edit(params: ImageEditParams & RequestOptions): Promise<ImageGenerateResponse> {
         const { signal, cleanup } = buildSignal(params);
         const formData = new FormData();
@@ -416,6 +431,7 @@ class Images {
         }
     }
 
+    /** Securely proxies generated image URLs. */
     async proxy(params: { url: string } & RequestOptions): Promise<Response> {
         const { signal, cleanup } = buildSignal(params);
         try {
@@ -434,8 +450,10 @@ class Images {
     }
 }
 
+/** Text embeddings resource. */
 class Embeddings {
     constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    /** Creates an embedding vector representing the input text. */
     async create(params: EmbeddingCreateParams & RequestOptions): Promise<EmbeddingCreateResponse> {
         const { signal, cleanup } = buildSignal(params);
         try {
@@ -453,8 +471,31 @@ class Embeddings {
     }
 }
 
+/** Document reranking resource. */
+class Rerank {
+    constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    /** Reranks documents according to their semantic relevance to a query. */
+    async create(params: RerankCreateParams & RequestOptions): Promise<RerankCreateResponse> {
+        const { signal, cleanup } = buildSignal(params);
+        try {
+            const response = await safeFetch(`${this.baseURL}/rerank`, {
+                method: "POST",
+                headers: buildJsonHeaders(this.apiKey, this.defaultHeaders, params.headers),
+                body: JSON.stringify(stripRequestOptions(params)),
+                signal
+            });
+            await throwIfNotOk(response);
+            return response.json();
+        } finally {
+            cleanup();
+        }
+    }
+}
+
+/** Audio speech synthesis resource. */
 class AudioSpeech {
     constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    /** Generates audio from the input text. */
     async create(params: SpeechCreateParams & RequestOptions): Promise<SpeechResponse> {
         const { signal, cleanup } = buildSignal(params);
         try {
@@ -472,12 +513,14 @@ class AudioSpeech {
     }
 }
 
+/** Audio transcription resource. */
 class AudioTranscriptions {
     constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
 
     create(params: TranscriptionCreateParams & { response_format: 'text' | 'srt' | 'vtt' } & RequestOptions): Promise<string>;
     create(params: TranscriptionCreateParams & { response_format: 'verbose_json' } & RequestOptions): Promise<TranscriptionVerboseResponse>;
     create(params: TranscriptionCreateParams & { response_format?: 'json' } & RequestOptions): Promise<TranscriptionResponse>;
+    /** Transcribes audio into the input language. */
     async create(params: TranscriptionCreateParams & RequestOptions): Promise<TranscriptionResponse | TranscriptionVerboseResponse | string> {
         const { signal, cleanup } = buildSignal(params);
         const formData = new FormData();
@@ -507,8 +550,10 @@ class AudioTranscriptions {
     }
 }
 
+/** Video generation resource. */
 class VideoGenerations {
     constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    /** Creates a video generation task given a prompt. */
     async create(params: VideoGenerationCreateParams & RequestOptions): Promise<VideoGenerationResponse> {
         const { signal, cleanup } = buildSignal(params);
         try {
@@ -526,8 +571,10 @@ class VideoGenerations {
     }
 }
 
+/** Video editing resource. */
 class VideoEdits {
     constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    /** Creates a video editing task given an original video and a prompt. */
     async create(params: VideoEditCreateParams & RequestOptions): Promise<VideoGenerationResponse> {
         const { signal, cleanup } = buildSignal(params);
         const formData = new FormData();
@@ -571,8 +618,10 @@ class VideoEdits {
     }
 }
 
+/** Generic native inference resource. */
 class NativeInference {
     constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    /** Executes a raw request against a specific model. */
     async run<TResponse = unknown, TPayload extends Record<string, unknown> = Record<string, unknown>>(modelPath: string, payload: TPayload, options: RequestOptions = {}): Promise<TResponse> {
         const { signal, cleanup } = buildSignal(options);
         try {
@@ -601,8 +650,10 @@ class NativeInference {
     }
 }
 
+/** Account balance resource. */
 class Balance {
     constructor(private apiKey: string, private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    /** Retrieves the current account balance in DZD. */
     async retrieve(options: RequestOptions = {}): Promise<BalanceResponse> {
         const { signal, cleanup } = buildSignal(options);
         try {
@@ -619,8 +670,10 @@ class Balance {
     }
 }
 
+/** API health check resource. */
 class Health {
     constructor(private baseURL: string, private defaultHeaders?: Record<string, string>) {}
+    /** Checks the health of the DEVUP API gateway. */
     async check(options: RequestOptions = {}): Promise<HealthResponse> {
         const { signal, cleanup } = buildSignal(options);
         try {
@@ -638,22 +691,37 @@ class Health {
     }
 }
 
+/**
+ * The main DEVUP AI client.
+ * Provides access to all DEVUP AI API endpoints through a resource-based interface.
+ */
 class DevupAI {
     baseURL: string;
+    /** Chat completions resource. */
     chat: Chat;
+    /** Available models resource. */
     models: Models;
+    /** Image generation and editing resource. */
     images: Images;
+    /** Text embeddings resource. */
     embeddings: Embeddings;
+    /** Audio speech and transcription resources. */
     audio: {
         speech: AudioSpeech;
         transcriptions: AudioTranscriptions;
     };
+    /** Video generation and editing resources. */
     video: {
         generations: VideoGenerations;
         edits: VideoEdits;
     };
+    /** Generic native inference resource. */
     inference: NativeInference;
+    /** Document reranking resource. */
+    rerank: Rerank;
+    /** Account balance resource. */
     balance: Balance;
+    /** API health check resource. */
     health: Health;
 
     constructor(options: DevUpAIOptions) {
@@ -665,6 +733,7 @@ class DevupAI {
         this.models = new Models(apiKey, baseURL, defaultHeaders);
         this.images = new Images(apiKey, baseURL, defaultHeaders);
         this.embeddings = new Embeddings(apiKey, baseURL, defaultHeaders);
+        this.rerank = new Rerank(apiKey, baseURL, defaultHeaders);
         this.audio = {
             speech: new AudioSpeech(apiKey, baseURL, defaultHeaders),
             transcriptions: new AudioTranscriptions(apiKey, baseURL, defaultHeaders)

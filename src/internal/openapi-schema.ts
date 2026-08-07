@@ -44,6 +44,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/rerank": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rerank documents
+         * @description Reranks a list of documents based on their semantic relevance to the provided query. Returns a sorted list of relevance scores and optionally the documents themselves.
+         */
+        post: operations["createReranking"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/generations": {
         parameters: {
             query?: never;
@@ -370,6 +390,35 @@ export interface components {
                 prompt_tokens?: number;
                 total_tokens?: number;
             };
+            _devup: components["schemas"]["DevUpBilling"];
+        };
+        RerankRequest: {
+            /** @description Reranker model identifier. */
+            model: string;
+            /** @description The semantic search query. */
+            query: string;
+            /** @description A list of text documents to rerank. */
+            documents: string[];
+            /** @description The number of top documents to return. Defaults to the length of the documents array. */
+            top_n?: number;
+            /**
+             * @description Whether to include the original document text in the response.
+             * @default false
+             */
+            return_documents: boolean;
+        };
+        RerankResponse: {
+            /** @enum {string} */
+            object: "list";
+            model: string;
+            results: {
+                /** @description The index of the document in the original request array. */
+                index: number;
+                /** @description The semantic relevance score for the document. */
+                relevance_score: number;
+                /** @description The original document text (only included if return_documents is true). */
+                document?: string;
+            }[];
             _devup: components["schemas"]["DevUpBilling"];
         };
         /**
@@ -916,6 +965,93 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
+            429: components["responses"]["RateLimited"];
+            502: components["responses"]["ComputeError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createReranking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "model": "Qwen/Qwen3-Reranker-8B",
+                 *       "query": "What is DEVUP AI?",
+                 *       "documents": [
+                 *         "DEVUP AI is a unified AI gateway.",
+                 *         "Paris is the capital of France."
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["RerankRequest"];
+            };
+        };
+        responses: {
+            /** @description Documents reranked successfully. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "object": "list",
+                     *       "model": "Qwen/Qwen3-Reranker-8B",
+                     *       "results": [
+                     *         {
+                     *           "index": 0,
+                     *           "relevance_score": 0.9854
+                     *         },
+                     *         {
+                     *           "index": 1,
+                     *           "relevance_score": 0.0012
+                     *         }
+                     *       ],
+                     *       "_devup": {
+                     *         "cost_dzd": 0.0001,
+                     *         "balance_dzd": 500
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["RerankResponse"];
+                };
+            };
+            /** @description Invalid request body or parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            402: components["responses"]["InsufficientBalance"];
+            403: components["responses"]["Forbidden"];
+            /** @description Model not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "message": "Model \"unknown-model\" not found.",
+                     *         "type": "devup_error",
+                     *         "code": "model_not_found"
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             429: components["responses"]["RateLimited"];
             502: components["responses"]["ComputeError"];
             503: components["responses"]["ServiceUnavailable"];

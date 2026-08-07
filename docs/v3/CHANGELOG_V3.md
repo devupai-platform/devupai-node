@@ -1,6 +1,11 @@
 # Changelog - DEVUP AI SDK V3
 
-## [3.0.0] - Unreleased
+## [3.1.0] - Unreleased
+
+### Added
+- **`rerank.create` Restored:** The `rerank.create()` method has been restored as a first-class feature in the SDK, matching the newly deployed dedicated `/v1/rerank` backend endpoint. This supersedes the `3.0.0` deprecation notice which previously instructed users to route these requests through the generic `inference.run()` proxy.
+
+## [3.0.0] - 2026-08-05
 
 ### Added
 - **TypeScript & OpenAPI Alignment:** The SDK's public types are now strictly derived from the official DEVUP AI OpenAPI V1 contract (`openapi/devupai-v1.yaml`).

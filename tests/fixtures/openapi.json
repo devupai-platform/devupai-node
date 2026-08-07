@@ -34,6 +34,10 @@
       "description": "Generate embedding vectors from text."
     },
     {
+      "name": "Reranking",
+      "description": "Rerank documents according to their semantic relevance to a query."
+    },
+    {
       "name": "Images",
       "description": "Generate images from text prompts and proxy generated image URLs."
     },
@@ -290,6 +294,121 @@
           },
           "402": {
             "$ref": "#/components/responses/InsufficientBalance"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "502": {
+            "$ref": "#/components/responses/ComputeError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/rerank": {
+      "post": {
+        "operationId": "createReranking",
+        "summary": "Rerank documents",
+        "description": "Reranks a list of documents based on their semantic relevance to the provided query. Returns a sorted list of relevance scores and optionally the documents themselves.\n",
+        "tags": [
+          "Reranking"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RerankRequest"
+              },
+              "example": {
+                "model": "Qwen/Qwen3-Reranker-8B",
+                "query": "What is DEVUP AI?",
+                "documents": [
+                  "DEVUP AI is a unified AI gateway.",
+                  "Paris is the capital of France."
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Documents reranked successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RerankResponse"
+                },
+                "example": {
+                  "object": "list",
+                  "model": "Qwen/Qwen3-Reranker-8B",
+                  "results": [
+                    {
+                      "index": 0,
+                      "relevance_score": 0.9854
+                    },
+                    {
+                      "index": 1,
+                      "relevance_score": 0.0012
+                    }
+                  ],
+                  "_devup": {
+                    "cost_dzd": 0.0001,
+                    "balance_dzd": 500
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body or parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missing_model": {
+                    "summary": "Missing model field",
+                    "value": {
+                      "error": {
+                        "message": "The \"model\" field is required.",
+                        "type": "devup_error",
+                        "code": "missing_model"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/InsufficientBalance"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Model not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "message": "Model \"unknown-model\" not found.",
+                    "type": "devup_error",
+                    "code": "model_not_found"
+                  }
+                }
+              }
+            }
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
@@ -1561,6 +1680,87 @@
               },
               "total_tokens": {
                 "type": "integer"
+              }
+            }
+          },
+          "_devup": {
+            "$ref": "#/components/schemas/DevUpBilling"
+          }
+        }
+      },
+      "RerankRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "query",
+          "documents"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "Reranker model identifier."
+          },
+          "query": {
+            "type": "string",
+            "description": "The semantic search query."
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "A list of text documents to rerank."
+          },
+          "top_n": {
+            "type": "integer",
+            "description": "The number of top documents to return. Defaults to the length of the documents array."
+          },
+          "return_documents": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to include the original document text in the response."
+          }
+        }
+      },
+      "RerankResponse": {
+        "type": "object",
+        "required": [
+          "object",
+          "model",
+          "results",
+          "_devup"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "enum": [
+              "list"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "index",
+                "relevance_score"
+              ],
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "description": "The index of the document in the original request array."
+                },
+                "relevance_score": {
+                  "type": "number",
+                  "description": "The semantic relevance score for the document."
+                },
+                "document": {
+                  "type": "string",
+                  "description": "The original document text (only included if return_documents is true)."
+                }
               }
             }
           },

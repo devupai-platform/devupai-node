@@ -187,6 +187,30 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
       expect(headers['X-Test']).toBe('1');
     });
 
+    it('rerank.create hits /rerank and sends correct JSON payload', async () => {
+      const payload: any = {
+        model: 'Qwen/Qwen3-Reranker-8B',
+        query: 'What is Devup AI?',
+        documents: ['Devup AI is an API gateway'],
+        top_n: 1,
+        return_documents: true,
+        headers: { 'X-Rerank': 'test' }
+      };
+      const response = await client.rerank.create(payload);
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/rerank');
+      expect(lastRequestInfo?.init.method).toBe('POST');
+      const body = JSON.parse(lastRequestInfo?.init.body as string);
+      expect(body.model).toBe('Qwen/Qwen3-Reranker-8B');
+      expect(body.query).toBe('What is Devup AI?');
+      expect(body.documents).toEqual(['Devup AI is an API gateway']);
+      expect(body.top_n).toBe(1);
+      expect(body.return_documents).toBe(true);
+      const headers = lastRequestInfo?.init.headers as Record<string, string>;
+      expect(headers['X-Rerank']).toBe('test');
+      expect(headers['X-Global']).toBe('true');
+      expect(response).toHaveProperty('_devup');
+    });
+
     it('video.edits sends multipart to /video/generations with all fields', async () => {
       const videoBlob = new Blob(['vid']);
       const maskBlob = new Blob(['mask']);
@@ -268,6 +292,38 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
       await client.inference.run('example-org%2Fmodel-id', { test: true });
       // Should not double encode
       expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/inference/example-org%2Fmodel-id');
+    });
+
+    it('embeddings.create uses correct route and payload', async () => {
+      const response = await client.embeddings.create({
+        model: 'devup-embed-v1',
+        input: 'Test input'
+      });
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/embeddings');
+      expect(lastRequestInfo?.init.method).toBe('POST');
+      const body = JSON.parse(lastRequestInfo?.init.body as string);
+      expect(body.model).toBe('devup-embed-v1');
+      expect(body.input).toBe('Test input');
+      expect(response).toHaveProperty('_devup');
+    });
+
+    it('images.generate uses correct route and payload', async () => {
+      const response = await client.images.generate({
+        model: 'devup-image-v1',
+        prompt: 'A test image'
+      });
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/images/generations');
+      expect(lastRequestInfo?.init.method).toBe('POST');
+      const body = JSON.parse(lastRequestInfo?.init.body as string);
+      expect(body.model).toBe('devup-image-v1');
+      expect(body.prompt).toBe('A test image');
+      expect(response).toHaveProperty('_devup');
+    });
+
+    it('models.list uses correct route', async () => {
+      const response = await client.models.list();
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/models');
+      expect(lastRequestInfo?.init.method).toBe('GET');
     });
 
     it('plain-text error parsing', async () => {
