@@ -32,7 +32,7 @@ describe('DEVUP AI SDK V3 - Final Requirements', () => {
             for (const url of rawUrls) {
                 await client.images.proxy({ url });
                 const req = mockedFetch.mock.lastCall![0] as string;
-                expect(req.startsWith('https://api.devupai.com/api/v1/images/proxy')).toBe(true);
+                expect(req.startsWith('https://api.devupai.com/v1/images/proxy')).toBe(true);
                 const reqUrl = new URL(req);
                 expect(reqUrl.searchParams.get('url')).toBe(url);
             }

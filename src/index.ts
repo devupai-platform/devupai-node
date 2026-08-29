@@ -725,7 +725,7 @@ class DevupAI {
     health: Health;
 
     constructor(options: DevUpAIOptions) {
-        const baseURL = (options.baseURL || "https://api.devupai.com/api/v1").replace(/\/+$/, "");
+        const baseURL = (options.baseURL || "https://api.devupai.com/v1").replace(/\/+$/, "");
         this.baseURL = baseURL;
         const apiKey = options.apiKey;
         const defaultHeaders = options.headers;

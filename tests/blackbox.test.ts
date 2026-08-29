@@ -65,7 +65,7 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
   describe('Constructors and Configuration', () => {
     it('handles default base URL', () => {
       const client = new DevupAI({ apiKey: TEST_KEY });
-      expect(client.baseURL).toBe('https://api.devupai.com/api/v1');
+      expect(client.baseURL).toBe('https://api.devupai.com/v1');
     });
 
     it('handles custom base URL', () => {
@@ -83,7 +83,7 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
     it('resolves from default base URL', async () => {
       const client = new DevupAI({ apiKey: TEST_KEY });
       await client.health.check();
-      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/health');
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/health');
     });
   });
 
@@ -104,7 +104,7 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
 
     it('images.proxy calls the DEVUP API host and never fetches upstream directly', async () => {
       await client.images.proxy({ url: 'http://upstream.local/image.png' });
-      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/images/proxy?url=http%3A%2F%2Fupstream.local%2Fimage.png');
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/v1/images/proxy?url=http%3A%2F%2Fupstream.local%2Fimage.png');
     });
 
     it('models.list, health.check, and images.proxy never send Authorization', async () => {
@@ -173,7 +173,7 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
 
     it('balance.retrieve exact URL', async () => {
       await client.balance.retrieve();
-      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/user/balance');
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/v1/user/balance');
       const headers = lastRequestInfo?.init.headers as Record<string, string>;
       expect(headers['X-Global']).toBe('true');
     });
@@ -181,7 +181,7 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
     it('images.edit sends multipart to /images/generations', async () => {
       const blob = new Blob(['img']);
       await client.images.edit({ image: blob, prompt: 'test', headers: { 'X-Test': '1' } });
-      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/images/generations');
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/v1/images/generations');
       expect(lastRequestInfo?.init.body).toBeInstanceOf(FormData);
       const headers = lastRequestInfo?.init.headers as Record<string, string>;
       expect(headers['X-Test']).toBe('1');
@@ -197,7 +197,7 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
         headers: { 'X-Rerank': 'test' }
       };
       const response = await client.rerank.create(payload);
-      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/rerank');
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/v1/rerank');
       expect(lastRequestInfo?.init.method).toBe('POST');
       const body = JSON.parse(lastRequestInfo?.init.body as string);
       expect(body.model).toBe('Qwen/Qwen3-Reranker-8B');
@@ -229,7 +229,7 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
         headers: { 'X-Local': 'yes' }
       };
       const response = await client.video.edits.create(payload);
-      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/video/generations');
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/v1/video/generations');
       expect(lastRequestInfo?.init.body).toBeInstanceOf(FormData);
 
       const formData = lastRequestInfo?.init.body as FormData;
@@ -255,7 +255,7 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
     it('audio.speech.create with referenceAudioUrl and exact return type', async () => {
       const payload: any = { model: 'devup-tts-v1', input: 'test', voice: 'alloy', referenceAudioUrl: 'http://ref' };
       const response = await client.audio.speech.create(payload);
-      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/audio/speech');
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/v1/audio/speech');
       const body = JSON.parse(lastRequestInfo?.init.body as string);
       expect(body.referenceAudioUrl).toBe('http://ref');
       expect(response).toHaveProperty('url');
@@ -285,13 +285,13 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
 
     it('inference.run handles slash in model path', async () => {
       await client.inference.run('example-org/model-id', { test: true });
-      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/inference/example-org%2Fmodel-id');
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/v1/inference/example-org%2Fmodel-id');
     });
 
     it('inference.run handles already percent-encoded model path', async () => {
       await client.inference.run('example-org%2Fmodel-id', { test: true });
       // Should not double encode
-      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/inference/example-org%2Fmodel-id');
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/v1/inference/example-org%2Fmodel-id');
     });
 
     it('embeddings.create uses correct route and payload', async () => {
@@ -299,7 +299,7 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
         model: 'devup-embed-v1',
         input: 'Test input'
       });
-      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/embeddings');
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/v1/embeddings');
       expect(lastRequestInfo?.init.method).toBe('POST');
       const body = JSON.parse(lastRequestInfo?.init.body as string);
       expect(body.model).toBe('devup-embed-v1');
@@ -312,7 +312,7 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
         model: 'devup-image-v1',
         prompt: 'A test image'
       });
-      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/images/generations');
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/v1/images/generations');
       expect(lastRequestInfo?.init.method).toBe('POST');
       const body = JSON.parse(lastRequestInfo?.init.body as string);
       expect(body.model).toBe('devup-image-v1');
@@ -322,7 +322,7 @@ describe('DEVUP AI SDK V3 - Black-box Tests', () => {
 
     it('models.list uses correct route', async () => {
       const response = await client.models.list();
-      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/api/v1/models');
+      expect(lastRequestInfo?.url).toBe('https://api.devupai.com/v1/models');
       expect(lastRequestInfo?.init.method).toBe('GET');
     });
 

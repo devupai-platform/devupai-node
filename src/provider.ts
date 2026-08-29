@@ -32,7 +32,7 @@ export interface DevupAIProviderSettings {
     apiKey?: string;
     /**
      * Base URL for the DEVUP AI API.
-     * @default "https://api.devupai.com/api/v1"
+     * @default "https://api.devupai.com/v1"
      */
     baseURL?: string;
     /**
@@ -115,7 +115,7 @@ export interface DevupAIProvider {
  * ```
  */
 export function createDevupAI(options: DevupAIProviderSettings = {}): DevupAIProvider {
-  const baseURL = (options.baseURL ?? "https://api.devupai.com/api/v1").replace(
+  const baseURL = (options.baseURL ?? "https://api.devupai.com/v1").replace(
     /\/+$/,
     ""
   );

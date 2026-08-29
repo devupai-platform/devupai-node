@@ -667,7 +667,7 @@ import DevupAI from "devupai";
 
 const client = new DevupAI({
   apiKey: process.env.DEVUP_API_KEY!,
-  baseURL: "https://api.devupai.com/api/v1",
+  baseURL: "https://api.devupai.com/v1",
   headers: {
     "X-Application-Name": "my-application",
   },
@@ -677,7 +677,7 @@ const client = new DevupAI({
 | Option    | Type                     | Required | Default                          | Description                                 |
 | --------- | ------------------------ | -------: | -------------------------------- | ------------------------------------------- |
 | `apiKey`  | `string`                 |      Yes | —                                | Your DEVUP AI API key.                      |
-| `baseURL` | `string`                 |       No | `https://api.devupai.com/api/v1` | DEVUP AI API base URL.                      |
+| `baseURL` | `string`                 |       No | `https://api.devupai.com/v1`     | DEVUP AI API base URL.                      |
 | `headers` | `Record<string, string>` |       No | —                                | Custom headers included in client requests. |
 
 Protected authentication and content-type headers are managed by the SDK.
