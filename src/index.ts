@@ -135,6 +135,119 @@ export type BalanceResponse = components['schemas']['BalanceResponse'];
 export type HealthResponse = components['schemas']['HealthResponse'];
 
 /**
+ * Token usage details in webhook delivery payloads.
+ */
+export interface WebhookUsage {
+    /** Number of prompt tokens processed. */
+    prompt_tokens: number;
+    /** Number of completion tokens generated. */
+    completion_tokens: number;
+}
+
+/**
+ * Successful webhook delivery payload sent when asynchronous inference completes.
+ */
+export interface WebhookSuccessPayload {
+    /** Webhook delivery identifier (`whd_<uuid>`). */
+    id: string;
+    /** Status indicating successful inference execution. */
+    status: "succeeded";
+    /** Token consumption details. */
+    usage: WebhookUsage;
+    /** Final settled cost in Algerian Dinar (DZD). */
+    cost_dzd: number;
+    /** Billing settlement status. */
+    settlement: "settled";
+    /** Model execution results. */
+    results: Array<Record<string, unknown>>;
+}
+
+/**
+ * Details describing why an asynchronous inference request failed.
+ */
+export interface WebhookErrorDetails {
+    /** Error classification category. */
+    type: string;
+    /** Human-readable explanation of the failure. */
+    message: string;
+}
+
+/**
+ * Failed webhook delivery payload sent when asynchronous inference fails.
+ */
+export interface WebhookErrorPayload {
+    /** Webhook delivery identifier (`whd_<uuid>`). */
+    id: string;
+    /** Status indicating failed inference execution. */
+    status: "failed";
+    /** Token consumption details (zeroed on failure). */
+    usage: WebhookUsage;
+    /** Settled cost in DZD (`null` on failure). */
+    cost_dzd: null;
+    /** Billing settlement status. */
+    settlement: "failed";
+    /** Failure descriptor containing classification type and message. */
+    error: WebhookErrorDetails;
+}
+
+/**
+ * Inbound webhook delivery payload containing either success results or error details.
+ */
+export type WebhookEvent = WebhookSuccessPayload | WebhookErrorPayload;
+
+/**
+ * Specific failure reasons for webhook signature verification and payload construction.
+ */
+export type DevupWebhookVerificationErrorReason =
+    | "malformed_header"
+    | "timestamp_outside_tolerance"
+    | "no_matching_signature"
+    | "invalid_json";
+
+/**
+ * Error thrown when webhook payload construction or signature verification fails.
+ */
+export class DevupWebhookVerificationError extends Error {
+    readonly reason: DevupWebhookVerificationErrorReason;
+    readonly cause: unknown;
+
+    constructor(reason: DevupWebhookVerificationErrorReason, message: string, cause?: unknown) {
+        super(message);
+        this.name = "DevupWebhookVerificationError";
+        this.reason = reason;
+        this.cause = cause;
+        Object.setPrototypeOf(this, new.target.prototype);
+    }
+}
+
+/**
+ * Parameters for verifying an incoming DEVUP AI webhook request signature.
+ */
+export interface VerifyWebhookSignatureParams {
+    /**
+     * The raw, unparsed HTTP request body (string or Uint8Array).
+     *
+     * ⚠️ CRITICAL: `rawBody` MUST be the exact raw string or byte sequence received in the HTTP request.
+     * Re-serialising a parsed JSON object changes whitespace and key ordering, causing signature verification to fail.
+     */
+    rawBody: string | Uint8Array;
+    /**
+     * The incoming `X-DevUp-Signature` HTTP header value:
+     * `t=<unix_timestamp>,v1=<hex_signature>[,v1=<hex_signature>]`
+     */
+    signatureHeader: string;
+    /**
+     * The webhook signing secret configured in the DEVUP AI Dashboard.
+     */
+    secret: string;
+    /**
+     * Maximum allowed difference between request timestamp and current system time in seconds.
+     * @default 300 (5 minutes)
+     */
+    toleranceSeconds?: number;
+}
+
+/**
  * Common request options available on all resource methods.
  */
 export interface RequestOptions {
@@ -691,6 +804,260 @@ class Health {
     }
 }
 
+interface WebhookVerificationInternalResult {
+    ok: boolean;
+    reason?: DevupWebhookVerificationErrorReason;
+    errorMessage?: string;
+    bodyString?: string;
+}
+
+async function verifyWebhookInternal(params: VerifyWebhookSignatureParams): Promise<WebhookVerificationInternalResult> {
+    if (!params || typeof params !== "object") {
+        return {
+            ok: false,
+            reason: "malformed_header",
+            errorMessage: "Parameters object is required",
+        };
+    }
+
+    const { rawBody, signatureHeader, secret, toleranceSeconds = 300 } = params;
+
+    // Validate rawBody
+    let bodyBytes: Uint8Array;
+    let bodyString: string;
+    if (typeof rawBody === "string") {
+        bodyBytes = new TextEncoder().encode(rawBody);
+        bodyString = rawBody;
+    } else if (rawBody instanceof Uint8Array) {
+        bodyBytes = rawBody;
+        bodyString = new TextDecoder("utf-8").decode(rawBody);
+    } else {
+        return {
+            ok: false,
+            reason: "malformed_header",
+            errorMessage: "rawBody must be a string or Uint8Array",
+        };
+    }
+
+    // Validate signatureHeader format
+    if (typeof signatureHeader !== "string" || signatureHeader.trim() === "") {
+        return {
+            ok: false,
+            reason: "malformed_header",
+            errorMessage: "Missing or empty signature header",
+        };
+    }
+
+    const elements = signatureHeader.split(",");
+    let timestamp: number | null = null;
+    const signatures: string[] = [];
+
+    for (const element of elements) {
+        const trimmed = element.trim();
+        if (!trimmed) continue;
+        const equalIdx = trimmed.indexOf("=");
+        if (equalIdx === -1) continue;
+        const key = trimmed.slice(0, equalIdx).trim();
+        const value = trimmed.slice(equalIdx + 1).trim();
+
+        if (key === "t") {
+            if (/^\d+$/.test(value)) {
+                const parsed = parseInt(value, 10);
+                if (!isNaN(parsed)) {
+                    timestamp = parsed;
+                }
+            }
+        } else if (key === "v1") {
+            if (value) {
+                signatures.push(value);
+            }
+        }
+    }
+
+    if (timestamp === null) {
+        return {
+            ok: false,
+            reason: "malformed_header",
+            errorMessage: "Malformed signature header: missing or non-numeric timestamp 't'",
+        };
+    }
+
+    if (signatures.length === 0) {
+        return {
+            ok: false,
+            reason: "malformed_header",
+            errorMessage: "Malformed signature header: missing 'v1' signature",
+        };
+    }
+
+    // Tolerance check
+    const now = Math.floor(Date.now() / 1000);
+    const diff = Math.abs(now - timestamp);
+    if (diff > toleranceSeconds) {
+        return {
+            ok: false,
+            reason: "timestamp_outside_tolerance",
+            errorMessage: `Timestamp outside tolerance (${diff}s > ${toleranceSeconds}s)`,
+        };
+    }
+
+    // Secret check
+    if (typeof secret !== "string" || secret.trim() === "") {
+        return {
+            ok: false,
+            reason: "no_matching_signature",
+            errorMessage: "No webhook signing secret provided",
+        };
+    }
+
+    // Compute expected HMAC over `${timestamp}.${rawBody}`
+    const prefixBytes = new TextEncoder().encode(`${timestamp}.`);
+    const payloadBytes = new Uint8Array(prefixBytes.length + bodyBytes.length);
+    payloadBytes.set(prefixBytes, 0);
+    payloadBytes.set(bodyBytes, prefixBytes.length);
+
+    let key: CryptoKey;
+    try {
+        const secretBytes = new TextEncoder().encode(secret);
+        key = await globalThis.crypto.subtle.importKey(
+            "raw",
+            secretBytes,
+            { name: "HMAC", hash: "SHA-256" },
+            false,
+            ["verify"]
+        );
+    } catch {
+        return {
+            ok: false,
+            reason: "no_matching_signature",
+            errorMessage: "Failed to import secret for HMAC verification",
+        };
+    }
+
+    let matched = false;
+    for (const sig of signatures) {
+        if (sig.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(sig)) {
+            continue;
+        }
+        const sigBytes = new Uint8Array(sig.length / 2);
+        for (let i = 0; i < sigBytes.length; i++) {
+            sigBytes[i] = parseInt(sig.substring(i * 2, i * 2 + 2), 16);
+        }
+
+        try {
+            const isValid = await globalThis.crypto.subtle.verify(
+                "HMAC",
+                key,
+                sigBytes,
+                payloadBytes
+            );
+            if (isValid) {
+                matched = true;
+                break;
+            }
+        } catch {
+            // Ignore single signature error and continue
+        }
+    }
+
+    if (!matched) {
+        return {
+            ok: false,
+            reason: "no_matching_signature",
+            errorMessage: "No matching signature found for the provided secret",
+        };
+    }
+
+    return {
+        ok: true,
+        bodyString,
+    };
+}
+
+/**
+ * Verifies the authenticity and timestamp of an incoming DEVUP AI webhook request signature.
+ *
+ * ⚠️ CRITICAL: `rawBody` MUST be the exact raw string or byte sequence (Buffer/Uint8Array) received
+ * in the HTTP request before any JSON parsing. Re-serialising a parsed object alters formatting and
+ * will cause verification to fail.
+ *
+ * @param params - Verification parameters including rawBody, signatureHeader, secret, and optional toleranceSeconds.
+ * @returns A promise resolving to `true` if authentic and within tolerance, or `false` otherwise. Never throws on invalid signatures.
+ */
+export async function verifyWebhookSignature(params: VerifyWebhookSignatureParams): Promise<boolean> {
+    try {
+        const result = await verifyWebhookInternal(params);
+        return result.ok;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Verifies the authenticity of an incoming DEVUP AI webhook request, then parses and returns the typed event payload.
+ *
+ * ⚠️ CRITICAL: `rawBody` MUST be the exact raw string or byte sequence (Buffer/Uint8Array) received
+ * in the HTTP request before any JSON parsing. Re-serialising a parsed object alters formatting and
+ * will cause verification to fail.
+ *
+ * @param params - Verification parameters including rawBody, signatureHeader, secret, and optional toleranceSeconds.
+ * @returns A promise resolving to the parsed and typed webhook event payload.
+ * @throws {DevupWebhookVerificationError} If the header is malformed (`malformed_header`), timestamp is outside tolerance (`timestamp_outside_tolerance`), signature does not match (`no_matching_signature`), or body is not valid JSON (`invalid_json`).
+ */
+export async function constructWebhookEvent<T = WebhookEvent>(params: VerifyWebhookSignatureParams): Promise<T> {
+    const result = await verifyWebhookInternal(params);
+    if (!result.ok) {
+        throw new DevupWebhookVerificationError(
+            result.reason || "no_matching_signature",
+            result.errorMessage || "Webhook signature verification failed"
+        );
+    }
+    try {
+        return JSON.parse(result.bodyString!) as T;
+    } catch (jsonErr) {
+        const message = jsonErr instanceof Error ? jsonErr.message : String(jsonErr);
+        throw new DevupWebhookVerificationError(
+            "invalid_json",
+            `Failed to parse verified webhook payload as JSON: ${message}`,
+            jsonErr
+        );
+    }
+}
+
+/**
+ * Webhooks resource for verifying webhook signatures and constructing typed webhook events.
+ */
+export class Webhooks {
+    /**
+     * Verifies the authenticity and timestamp of an incoming DEVUP AI webhook request signature.
+     *
+     * ⚠️ CRITICAL: `rawBody` MUST be the exact raw string or byte sequence (Buffer/Uint8Array) received
+     * in the HTTP request before any JSON parsing. Re-serialising a parsed object alters formatting and
+     * will cause verification to fail.
+     *
+     * @param params - The verification parameters.
+     * @returns A promise resolving to `true` if valid, `false` otherwise. Never throws.
+     */
+    verifySignature(params: VerifyWebhookSignatureParams): Promise<boolean> {
+        return verifyWebhookSignature(params);
+    }
+
+    /**
+     * Verifies the incoming webhook signature, parses the request body, and returns the typed event payload.
+     *
+     * ⚠️ CRITICAL: `rawBody` MUST be the exact raw string or byte sequence (Buffer/Uint8Array) received
+     * in the HTTP request before any JSON parsing. Re-serialising a parsed object alters formatting and
+     * will cause verification to fail.
+     *
+     * @param params - The verification parameters.
+     * @returns A promise resolving to the typed webhook event payload.
+     * @throws {DevupWebhookVerificationError} On verification failure or malformed JSON.
+     */
+    constructEvent<T = WebhookEvent>(params: VerifyWebhookSignatureParams): Promise<T> {
+        return constructWebhookEvent<T>(params);
+    }
+}
+
 /**
  * The main DEVUP AI client.
  * Provides access to all DEVUP AI API endpoints through a resource-based interface.
@@ -723,6 +1090,8 @@ class DevupAI {
     balance: Balance;
     /** API health check resource. */
     health: Health;
+    /** Webhook verification and payload construction resource. */
+    webhooks: Webhooks;
 
     constructor(options: DevUpAIOptions) {
         const baseURL = (options.baseURL || "https://api.devupai.com/v1").replace(/\/+$/, "");
@@ -745,6 +1114,7 @@ class DevupAI {
         this.inference = new NativeInference(apiKey, baseURL, defaultHeaders);
         this.balance = new Balance(apiKey, baseURL, defaultHeaders);
         this.health = new Health(baseURL, defaultHeaders);
+        this.webhooks = new Webhooks();
     }
 }
 

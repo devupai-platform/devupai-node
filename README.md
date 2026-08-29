@@ -156,21 +156,23 @@ main().catch(console.error);
 
 ## Capability Matrix
 
-| Capability       | SDK method                             | Authentication |
-| ---------------- | -------------------------------------- | -------------- |
-| Chat completions | `client.chat.completions.create()`     | Required       |
-| Image generation | `client.images.generate()`             | Required       |
-| Image editing    | `client.images.edit()`                 | Required       |
-| Image proxy      | `client.images.proxy()`                | Public         |
-| Embeddings       | `client.embeddings.create()`           | Required       |
-| Text-to-speech   | `client.audio.speech.create()`         | Required       |
-| Transcription    | `client.audio.transcriptions.create()` | Required       |
-| Video generation | `client.video.generations.create()`    | Required       |
-| Video editing    | `client.video.edits.create()`          | Required       |
-| Native inference | `client.inference.run()`               | Required       |
-| Model discovery  | `client.models.list()`                 | Public         |
-| Account balance  | `client.balance.retrieve()`            | Required       |
-| Service health   | `client.health.check()`                | Public         |
+| Capability           | SDK method                             | Authentication           |
+| -------------------- | -------------------------------------- | ------------------------ |
+| Chat completions     | `client.chat.completions.create()`     | Required                 |
+| Image generation     | `client.images.generate()`             | Required                 |
+| Image editing        | `client.images.edit()`                 | Required                 |
+| Image proxy          | `client.images.proxy()`                | Public                   |
+| Embeddings           | `client.embeddings.create()`           | Required                 |
+| Text-to-speech       | `client.audio.speech.create()`         | Required                 |
+| Transcription        | `client.audio.transcriptions.create()` | Required                 |
+| Video generation     | `client.video.generations.create()`    | Required                 |
+| Video editing        | `client.video.edits.create()`          | Required                 |
+| Native inference     | `client.inference.run()`               | Required                 |
+| Model discovery      | `client.models.list()`                 | Public                   |
+| Account balance      | `client.balance.retrieve()`            | Required                 |
+| Service health       | `client.health.check()`                | Public                   |
+| Webhook verification | `client.webhooks.verifySignature()`    | None (local computation) |
+| Webhook construction | `client.webhooks.constructEvent()`     | None (local computation) |
 
 > Public operations omit the `Authorization` header.
 
@@ -560,6 +562,111 @@ proxyImage().catch(console.error);
 
 ---
 
+## Webhooks
+
+Verify incoming webhook deliveries and construct typed event payloads.
+
+You can import standalone helper functions directly or access them via `client.webhooks`.
+
+### Verifying and Parsing Events (Express)
+
+```typescript
+import express from "express";
+import {
+  constructWebhookEvent,
+  DevupWebhookVerificationError,
+  type WebhookEvent,
+} from "devupai";
+
+const app = express();
+const endpointSecret = process.env.DEVUP_WEBHOOK_SECRET!;
+
+// express.raw() is required: express.json() parses and alters the body bytes, causing verification to always fail
+app.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const signature = req.headers["x-devup-signature"];
+    if (typeof signature !== "string") {
+      return res.status(400).send("Missing signature header");
+    }
+
+    try {
+      const event: WebhookEvent = await constructWebhookEvent({
+        rawBody: req.body,
+        signatureHeader: signature,
+        secret: endpointSecret,
+      });
+
+      if (event.status === "succeeded") {
+        console.log("Inference succeeded:", event.id);
+        console.log("Results:", event.results);
+        console.log("Cost:", event.cost_dzd, "DZD");
+      } else {
+        console.error("Inference failed:", event.id);
+        console.error("Error:", event.error.type, event.error.message);
+      }
+
+      res.status(200).json({ received: true });
+    } catch (err) {
+      if (err instanceof DevupWebhookVerificationError) {
+        console.error(`Webhook verification failed (${err.reason}):`, err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+      }
+      res.status(500).send("Server Error");
+    }
+  }
+);
+
+app.listen(3000, () => console.log("Webhook receiver listening on port 3000"));
+```
+
+### Boolean Signature Verification
+
+For workflows that prefer conditional branching over exception handling, use `verifyWebhookSignature`:
+
+```typescript
+import { verifyWebhookSignature } from "devupai";
+
+async function handleWebhook(rawBody: string | Uint8Array, signatureHeader: string) {
+  const isValid = await verifyWebhookSignature({
+    rawBody,
+    signatureHeader,
+    secret: process.env.DEVUP_WEBHOOK_SECRET!,
+    toleranceSeconds: 300,
+  });
+
+  if (!isValid) {
+    console.warn("Rejected unauthorized or expired webhook delivery");
+    return false;
+  }
+
+  const payload = JSON.parse(
+    typeof rawBody === "string" ? rawBody : new TextDecoder().decode(rawBody)
+  );
+  return payload;
+}
+```
+
+### Verification Failure Reasons
+
+When `constructWebhookEvent` fails, it throws a `DevupWebhookVerificationError` with a specific `reason` field:
+
+| Reason | When it fires | What to do |
+| ------ | ------------- | ---------- |
+| `malformed_header` | The `X-DevUp-Signature` header is missing, empty, lacks a valid `t=` timestamp, or contains no `v1=` signatures. | Verify your web server forwards the `X-DevUp-Signature` header unmodified. |
+| `timestamp_outside_tolerance` | The difference between the request timestamp `t` and local system time exceeds `toleranceSeconds` (default 300s). | This usually indicates server clock skew rather than a forged request. Synchronize your server clock with NTP or increase `toleranceSeconds`. |
+| `no_matching_signature` | None of the `v1` signatures in the header match the computed HMAC over the raw body and timestamp. | Confirm that `secret` matches your dashboard webhook secret, and ensure `rawBody` is the untouched raw byte stream (not re-serialized JSON). |
+| `invalid_json` | The signature was successfully verified, but the payload body is not valid JSON. | Check upstream payload integrity and ensure no middle-tier proxy truncated the body. |
+
+### Deduplication
+
+Always key idempotency checks on the `X-DevUp-Delivery-Id` header. The delivery ID is generated once and remains identical across all retry attempts. Because the `t=` timestamp and signature are recomputed on every attempt, a consumer keying idempotency on the signature will treat legitimate retries as new events and process duplicate results.
+
+During a 24h secret rotation window, DEVUP AI attaches multiple `v1` signatures (computed with both the previous and new secret); accepting any matching signature allows zero-downtime secret rotations without coordinated cutovers.
+
+---
+
 # Vercel AI SDK
 
 Use the optional `devupai/ai` export with the Vercel AI SDK.
@@ -816,12 +923,22 @@ async function main() {
 main().catch(console.error);
 ```
 
+Webhook signature and payload verification failures throw `DevupWebhookVerificationError`. This is not an API error, carries no HTTP status code, and represents local validation failures.
+
+| Property  | Type                                  | Description                                                           |
+| --------- | ------------------------------------- | --------------------------------------------------------------------- |
+| `name`    | `"DevupWebhookVerificationError"`     | Error class identifier.                                               |
+| `message` | `string`                              | Human-readable description of the verification failure.               |
+| `reason`  | `DevupWebhookVerificationErrorReason` | Machine-readable failure reason code.                                 |
+| `cause`   | `unknown`                             | Underlying error when available (e.g. `SyntaxError` on invalid JSON). |
+
 ---
 
 # Runtime and Security
 
 - Node.js 18+ support
 - Browser and Edge-compatible request primitives
+- Webhook signature verification uses Web Crypto (`globalThis.crypto.subtle`) and runs asynchronously across Node.js 18+, Edge runtimes, Cloudflare Workers, Deno, Bun, and browsers with zero dependencies
 - Protected authentication and content-type headers
 - Public methods that omit authorization
 - Timeout and external abort-signal support

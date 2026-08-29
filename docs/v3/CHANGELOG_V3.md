@@ -3,6 +3,9 @@
 ## [3.1.0] - Unreleased
 
 ### Added
+- **Webhook Signature Verification:** Added `verifyWebhookSignature()` and `constructWebhookEvent()` standalone helpers alongside `client.webhooks` resource namespace for verifying inbound DEVUP AI webhook delivery callbacks. Implemented with Web Crypto API (`crypto.subtle`) for zero-dependency compatibility across Node.js 18+, Edge runtimes, Cloudflare Workers, Deno, Bun, and browsers.
+- **`DevupWebhookVerificationError` Class:** Exported dedicated verification error class with granular `reason` codes (`malformed_header`, `timestamp_outside_tolerance`, `no_matching_signature`, `invalid_json`).
+- **Webhook Payload Types:** Exported `WebhookEvent`, `WebhookSuccessPayload`, `WebhookErrorPayload`, and `WebhookUsage` interfaces.
 - **`rerank.create` Restored:** The `rerank.create()` method has been restored as a first-class feature in the SDK, matching the newly deployed dedicated `/v1/rerank` backend endpoint. This supersedes the `3.0.0` deprecation notice which previously instructed users to route these requests through the generic `inference.run()` proxy.
 
 ## [3.0.0] - 2026-08-05
