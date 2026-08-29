@@ -1,0 +1,6 @@
+* text=auto
+
+# Hashed byte-exact by the OpenAPI provenance gate. Never normalise line endings.
+audit/openapi/devupai-v1.yaml   -text
+audit/openapi/PROVENANCE.json   -text
+tests/fixtures/openapi.json     -text

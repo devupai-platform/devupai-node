@@ -67,7 +67,7 @@
     }
   ],
   "paths": {
-    "/api/v1/chat/completions": {
+    "/v1/chat/completions": {
       "post": {
         "operationId": "createChatCompletion",
         "summary": "Create a chat completion",
@@ -200,7 +200,7 @@
         }
       }
     },
-    "/api/v1/embeddings": {
+    "/v1/embeddings": {
       "post": {
         "operationId": "createEmbedding",
         "summary": "Create embeddings",
@@ -307,7 +307,7 @@
         }
       }
     },
-    "/api/v1/rerank": {
+    "/v1/rerank": {
       "post": {
         "operationId": "createReranking",
         "summary": "Rerank documents",
@@ -422,7 +422,7 @@
         }
       }
     },
-    "/api/v1/images/generations": {
+    "/v1/images/generations": {
       "post": {
         "operationId": "createImageGeneration",
         "summary": "Generate images from a text prompt",
@@ -501,7 +501,7 @@
         }
       }
     },
-    "/api/v1/images/proxy": {
+    "/v1/images/proxy": {
       "get": {
         "operationId": "proxyImage",
         "summary": "Proxy a generated image URL",
@@ -597,7 +597,7 @@
         }
       }
     },
-    "/api/v1/audio/speech": {
+    "/v1/audio/speech": {
       "post": {
         "operationId": "createSpeech",
         "summary": "Generate speech from text",
@@ -699,7 +699,7 @@
         }
       }
     },
-    "/api/v1/audio/transcriptions": {
+    "/v1/audio/transcriptions": {
       "post": {
         "operationId": "createTranscription",
         "summary": "Transcribe audio to text",
@@ -773,7 +773,7 @@
         }
       }
     },
-    "/api/v1/video/generations": {
+    "/v1/video/generations": {
       "post": {
         "operationId": "createVideoGeneration",
         "summary": "Generate a video from a text prompt",
@@ -880,7 +880,7 @@
         }
       }
     },
-    "/api/v1/models": {
+    "/v1/models": {
       "get": {
         "operationId": "listModels",
         "summary": "List available models",
@@ -923,7 +923,7 @@
         }
       }
     },
-    "/api/v1/inference/{model_path}": {
+    "/v1/inference/{model_path}": {
       "post": {
         "operationId": "createNativeInference",
         "summary": "Native model inference",
@@ -1003,7 +1003,7 @@
         }
       }
     },
-    "/api/v1/user/balance": {
+    "/v1/user/balance": {
       "get": {
         "operationId": "getUserBalance",
         "summary": "Get account balance",
@@ -1037,7 +1037,7 @@
         }
       }
     },
-    "/api/health": {
+    "/health": {
       "get": {
         "operationId": "healthCheck",
         "summary": "Platform health check",

@@ -1,0 +1,1789 @@
+openapi: 3.1.0
+info:
+  title: DEVUP AI API
+  version: 1.0.0
+  description: >
+    The DEVUP AI API provides a unified AI gateway with OpenAI-compatible
+    interfaces for chat completions, embeddings, model listing, and selected
+    multimodal request formats, alongside DEVUP-native image, speech, video,
+    native inference, and account operations.
+
+    Authenticate with a DEVUP AI Bearer API key and pay in Algerian Dinar
+    according to the applicable usage unit, including tokens, characters,
+    audio duration, or generated items.
+  contact:
+    name: DEVUP AI Support
+    url: https://devupai.com
+  license:
+    name: Proprietary
+    url: https://devupai.com/terms
+
+servers:
+  - url: https://api.devupai.com
+    description: Production
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Chat
+    description: OpenAI-compatible chat completions (streaming and non-streaming).
+  - name: Embeddings
+    description: Generate embedding vectors from text.
+  - name: Reranking
+    description: Rerank documents according to their semantic relevance to a query.
+  - name: Images
+    description: Generate images from text prompts and proxy generated image URLs.
+  - name: Audio
+    description: Text-to-speech synthesis and speech-to-text transcription.
+  - name: Video
+    description: Text-to-video and video editing generation.
+  - name: Models
+    description: List all available models in OpenAI-compatible format.
+  - name: Inference
+    description: Native inference proxy — send any payload to any model via a catch-all path.
+  - name: Account
+    description: Retrieve account balance information.
+
+  - name: Utilities
+    description: Platform health and status checks.
+
+paths:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Chat
+  # ─────────────────────────────────────────────────────────────────────────
+  /v1/chat/completions:
+    post:
+      operationId: createChatCompletion
+      summary: Create a chat completion
+      description: >
+        Generates a model response for the given conversation. Supports
+        streaming via `stream: true` (SSE). All responses include a
+        `_devup` billing metadata object.
+      tags: [Chat]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCompletionRequest'
+            example:
+              model: deepseek-ai/DeepSeek-V4-Pro
+              messages:
+                - role: user
+                  content: Hello from Algeria!
+              max_tokens: 256
+              stream: false
+      responses:
+        '200':
+          description: Successful chat completion (non-streaming).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatCompletionResponse'
+              example:
+                id: devup-12345678-abcd-1234-abcd-1234567890ab
+                object: chat.completion
+                created: 1700000000
+                model: deepseek-ai/DeepSeek-V4-Pro
+                choices:
+                  - index: 0
+                    message:
+                      role: assistant
+                      content: Hello! How can I help you today?
+                    finish_reason: stop
+                usage:
+                  prompt_tokens: 10
+                  completion_tokens: 8
+                _devup:
+                  cost_dzd: 0.0012
+                  balance_dzd: 500.00
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-Sent Events stream of chat completion chunks.
+        '400':
+          description: Invalid request body or parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing_model:
+                  summary: Missing model field
+                  value:
+                    error:
+                      message: 'The "model" field is required.'
+                      type: devup_error
+                      code: missing_model
+                payload_too_large:
+                  summary: Messages array too large
+                  value:
+                    error:
+                      message: messages array exceeds the maximum of 512 entries.
+                      type: devup_error
+                      code: payload_too_large
+                invalid_max_tokens:
+                  summary: max_tokens out of range
+                  value:
+                    error:
+                      message: max_tokens must be between 1 and 32,768.
+                      type: devup_error
+                      code: invalid_max_tokens
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/InsufficientBalance'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          $ref: '#/components/responses/ComputeError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Embeddings
+  # ─────────────────────────────────────────────────────────────────────────
+  /v1/embeddings:
+    post:
+      operationId: createEmbedding
+      summary: Create embeddings
+      description: >
+        Generates embedding vectors for the given input text or array of
+        texts. Compatible with the OpenAI embeddings API.
+      tags: [Embeddings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingRequest'
+            example:
+              model: Qwen/Qwen3-Embedding-8B
+              input: Hello world
+              encoding_format: float
+      responses:
+        '200':
+          description: Embedding vectors generated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingResponse'
+              example:
+                object: list
+                data:
+                  - object: embedding
+                    index: 0
+                    embedding: [0.0023, -0.0091, 0.0152]
+                model: Qwen/Qwen3-Embedding-8B
+                usage:
+                  prompt_tokens: 2
+                  total_tokens: 2
+                _devup:
+                  cost_dzd: 0.0001
+                  balance_dzd: 500.00
+        '400':
+          description: Invalid request body or parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing_model:
+                  summary: Missing model field
+                  value:
+                    error:
+                      message: 'The "model" field is required.'
+                      type: devup_error
+                      code: missing_model
+                payload_too_large:
+                  summary: Input array too large
+                  value:
+                    error:
+                      message: input array exceeds the maximum of 2,048 entries.
+                      type: devup_error
+                      code: payload_too_large
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/InsufficientBalance'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          $ref: '#/components/responses/ComputeError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Reranking
+  # ─────────────────────────────────────────────────────────────────────────
+  /v1/rerank:
+    post:
+      operationId: createReranking
+      summary: Rerank documents
+      description: >
+        Reranks a list of documents based on their semantic relevance to the provided query.
+        Returns a sorted list of relevance scores and optionally the documents themselves.
+      tags: [Reranking]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RerankRequest'
+            example:
+              model: Qwen/Qwen3-Reranker-8B
+              query: "What is DEVUP AI?"
+              documents:
+                - "DEVUP AI is a unified AI gateway."
+                - "Paris is the capital of France."
+      responses:
+        '200':
+          description: Documents reranked successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RerankResponse'
+              example:
+                object: list
+                model: Qwen/Qwen3-Reranker-8B
+                results:
+                  - index: 0
+                    relevance_score: 0.9854
+                  - index: 1
+                    relevance_score: 0.0012
+                _devup:
+                  cost_dzd: 0.0001
+                  balance_dzd: 500.00
+        '400':
+          description: Invalid request body or parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing_model:
+                  summary: Missing model field
+                  value:
+                    error:
+                      message: 'The "model" field is required.'
+                      type: devup_error
+                      code: missing_model
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/InsufficientBalance'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Model not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  message: 'Model "unknown-model" not found.'
+                  type: devup_error
+                  code: model_not_found
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          $ref: '#/components/responses/ComputeError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Images — Generation
+  # ─────────────────────────────────────────────────────────────────────────
+  /v1/images/generations:
+    post:
+      operationId: createImageGeneration
+      summary: Generate images from a text prompt
+      description: >
+        Creates one or more images from a text prompt. Supports JSON and
+        multipart/form-data request bodies. Returns a URL to the generated
+        image hosted on DEVUP AI storage.
+      tags: [Images]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImageGenerationRequest'
+            example:
+              model: stabilityai/stable-diffusion-xl-base-1.0
+              prompt: A futuristic city skyline at sunset
+              size: 1024x1024
+              n: 1
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImageEditRequest'
+            example:
+              model: stabilityai/stable-diffusion-xl-base-1.0
+              prompt: A futuristic city skyline at sunset
+              image: <binary data>
+              size: 1024x1024
+              n: 1
+      responses:
+        '200':
+          description: Image generated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageGenerationResponse'
+              example:
+                data:
+                  - url: https://api.devupai.com/storage/generations/img_example_1700000000.png
+                _devup:
+                  cost_dzd: 5.0000
+                  balance_dzd: 495.00
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/InsufficientBalance'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          $ref: '#/components/responses/ComputeError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Images — Proxy
+  # ─────────────────────────────────────────────────────────────────────────
+  /v1/images/proxy:
+    get:
+      operationId: proxyImage
+      summary: Proxy a generated image URL
+      description: >
+        Fetches and proxies an image from a DEVUP AI storage URL.
+        Returns the raw image binary with appropriate caching headers.
+        No authentication required.
+      tags: [Images]
+      security: []
+      parameters:
+        - name: url
+          in: query
+          required: true
+          description: The full URL of the image to proxy. Must be from an allowed domain.
+          schema:
+            type: string
+            format: uri
+          example: https://api.devupai.com/storage/generations/img_example.png
+      responses:
+        '200':
+          description: Image binary data.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: public, max-age=31536000, immutable
+        '400':
+          description: Missing or invalid URL parameter.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Missing URL
+        '403':
+          description: Domain not in the allowlist.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Forbidden: Domain not allowed"
+        '502':
+          description: Failed to fetch the upstream image.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Failed to load image
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Audio — Speech (TTS)
+  # ─────────────────────────────────────────────────────────────────────────
+  /v1/audio/speech:
+    post:
+      operationId: createSpeech
+      summary: Generate speech from text
+      description: >
+        Converts text into spoken audio. The audio file is stored on
+        DEVUP AI storage and a URL is returned. Billed per 1,000 characters.
+      tags: [Audio]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpeechRequest'
+            example:
+              model: tts-1
+              input: Welcome to DEVUP AI, the gateway to open-source models.
+              voice: aura-asteria-en
+              response_format: mp3
+      responses:
+        '200':
+          description: Audio generated and stored successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpeechResponse'
+              example:
+                url: https://api.devupai.com/storage/audio/tts_example_1700000000.mp3
+                _devup:
+                  cost_dzd: 0.5000
+                  balance_dzd: 499.50
+        '400':
+          description: Invalid request body or parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing_model:
+                  summary: Missing model field
+                  value:
+                    error:
+                      message: 'The "model" field is required.'
+                      type: devup_error
+                      code: missing_model
+                reference_audio_required:
+                  summary: referenceAudioUrl required for AUDIO_REFERENCE model
+                  value:
+                    error:
+                      message: Model "x" requires a "referenceAudioUrl" field containing a URL to a reference audio file for voice cloning.
+                      type: devup_error
+                      code: reference_audio_required
+                invalid_reference_audio_url:
+                  summary: referenceAudioUrl validation failed
+                  value:
+                    error:
+                      message: referenceAudioUrl is not valid, does not use HTTPS, or points to a blocked address.
+                      type: devup_error
+                      code: invalid_reference_audio_url
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/InsufficientBalance'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          $ref: '#/components/responses/ComputeError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Audio — Transcriptions (STT)
+  # ─────────────────────────────────────────────────────────────────────────
+  /v1/audio/transcriptions:
+    post:
+      operationId: createTranscription
+      summary: Transcribe audio to text
+      description: >
+        Transcribes audio into text using speech recognition models.
+        Accepts multipart/form-data with a `file` field containing the
+        audio data. Billed per audio minute.
+      tags: [Audio]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TranscriptionRequest'
+      responses:
+        '200':
+          description: Transcription completed successfully.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/TranscriptionResponse'
+                  - $ref: '#/components/schemas/TranscriptionVerboseResponse'
+              example:
+                text: Hello, this is a test recording.
+                duration: 2.5
+                segments:
+                  - start: 0.0
+                    end: 2.5
+                    text: Hello, this is a test recording.
+            text/plain:
+              schema:
+                type: string
+              example: Hello, this is a test recording.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/InsufficientBalance'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          $ref: '#/components/responses/ComputeError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Video
+  # ─────────────────────────────────────────────────────────────────────────
+  /v1/video/generations:
+    post:
+      operationId: createVideoGeneration
+      summary: Generate a video from a text prompt
+      description: >
+        Creates a video from a text prompt or edits an existing video.
+        Supports both JSON and multipart/form-data for video editing
+        workflows. Returns a URL to the generated video.
+      tags: [Video]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoGenerationRequest'
+            example:
+              model: example-org/example-video-model
+              prompt: A cat astronaut floating in space
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VideoEditRequest'
+      responses:
+        '200':
+          description: Video generated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoGenerationResponse'
+              example:
+                data:
+                  - url: https://api.devupai.com/storage/generations/vid_example_1700000000.mp4
+                _devup:
+                  cost_dzd: 25.0000
+                  balance_dzd: 475.00
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/InsufficientBalance'
+        '429':
+          description: >
+            Rate limit or concurrency limit exceeded.
+            This endpoint applies two independent limits:
+            (1) 100 requests per 60-second sliding window per account — returns standard rate-limit headers.
+            (2) 150 globally in-flight video generation requests — when this threshold is exceeded, a 429
+            is returned with Retry-After: 10 and no rate-limit headers.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying (10 for concurrency limit; varies for rate limit).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                account_rate_limit:
+                  summary: Per-account sliding window exceeded
+                  value:
+                    error:
+                      message: Rate limit exceeded. Please slow down your requests and try again shortly.
+                      type: devup_error
+                      code: rate_limit_exceeded
+                global_concurrency_limit:
+                  summary: Global in-flight video limit (150) exceeded
+                  value:
+                    error:
+                      message: Too many concurrent video generation requests, please retry shortly.
+                      type: devup_error
+                      code: rate_limit_exceeded
+        '502':
+          $ref: '#/components/responses/ComputeError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Models
+  # ─────────────────────────────────────────────────────────────────────────
+  /v1/models:
+    get:
+      operationId: listModels
+      summary: List available models
+      description: >
+        Returns a list of all published models in OpenAI-compatible format.
+        No authentication required. Some OpenAI SDKs call this endpoint
+        automatically on initialization.
+      tags: [Models]
+      security: []
+      responses:
+        '200':
+          description: Model list retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelListResponse'
+              example:
+                object: list
+                data:
+                  - id: deepseek-ai/DeepSeek-V4-Pro
+                    object: model
+                    created: 1700000000
+                    owned_by: devupai
+                  - id: Qwen/Qwen3-Embedding-8B
+                    object: model
+                    created: 1700000100
+                    owned_by: devupai
+        '404':
+          description: Endpoint not found.
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Inference (Native catch-all)
+  # ─────────────────────────────────────────────────────────────────────────
+  /v1/inference/{model_path}:
+    post:
+      operationId: createNativeInference
+      summary: Native model inference
+      description: >
+        A catch-all proxy endpoint that forwards any JSON payload to the
+        specified model. The model path uses a `provider/model-name` format
+        (e.g., `deepseek-ai/DeepSeek-V4-Pro`). The request body schema is
+        model-dependent — consult the model's documentation for supported
+        parameters.
+      tags: [Inference]
+      parameters:
+        - name: model_path
+          in: path
+          required: true
+          description: >
+            The model identifier in `org/model-name` format. Model identifiers
+            may contain slash-separated segments. Generated SDKs may percent-encode
+            `/` as `%2F`. DEVUP accepts both literal slash-separated paths and
+            percent-encoded slash values (e.g., `deepseek-ai/DeepSeek-V4-Pro` or
+            `deepseek-ai%2FDeepSeek-V4-Pro`).
+          schema:
+            type: string
+          example: deepseek-ai/DeepSeek-V4-Pro
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: >
+                Free-form JSON payload forwarded to the model. The exact
+                schema depends on the target model.
+              properties:
+                webhook:
+                  type: string
+                  format: uri
+                  description: >
+                    Optional callback URL for asynchronous delivery of inference
+                    results. This field is honoured on this native inference
+                    endpoint only and silently ignored on OpenAI-compatible routes.
+              additionalProperties: true
+            example:
+              input: Hello from Algeria!
+              max_new_tokens: 256
+      responses:
+        '200':
+          description: Inference completed successfully. Response schema is model-dependent.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  _devup:
+                    oneOf:
+                      - $ref: '#/components/schemas/DevUpBilling'
+                      - type: object
+                        description: Billing reservation metadata when webhook callback is requested.
+                        required:
+                          - reserved_dzd
+                          - status
+                        properties:
+                          reserved_dzd:
+                            type: number
+                            description: Funds held in Algerian Dinar (DZD) pending completion.
+                          status:
+                            type: string
+                            enum: [pending_settlement]
+              examples:
+                synchronous:
+                  summary: Synchronous response (no webhook)
+                  value:
+                    output: Example model output
+                    _devup:
+                      cost_dzd: 0.0500
+                      balance_dzd: 499.95
+                asynchronous:
+                  summary: Asynchronous response (webhook specified)
+                  value:
+                    id: inf-9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+                    model: deepseek-ai/DeepSeek-V4-Pro
+                    inference_status:
+                      status: queued
+                    _devup:
+                      reserved_dzd: 1
+                      status: pending_settlement
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/InsufficientBalance'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '502':
+          $ref: '#/components/responses/ComputeError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Account
+  # ─────────────────────────────────────────────────────────────────────────
+  /v1/user/balance:
+    get:
+      operationId: getUserBalance
+      summary: Get account balance
+      description: >
+        Returns the current DZD balance for the authenticated user.
+      tags: [Account]
+      responses:
+        '200':
+          description: Balance retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+              example:
+                balance_dzd: 500.00
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Utilities
+  # ─────────────────────────────────────────────────────────────────────────
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Platform health check
+      description: >
+        Returns the health status of the DEVUP AI platform. Returns
+        `{"status":"ok"}` when the platform is healthy, or a 503 with
+        `{"status":"error"}` when unhealthy.
+      tags: [Utilities]
+      security: []
+      responses:
+        '200':
+          description: Platform is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+        '503':
+          description: Platform is unhealthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: error
+
+# ---------------------------------------------------------------------------
+# Webhooks
+# ---------------------------------------------------------------------------
+
+webhooks:
+  inferenceCallback:
+    post:
+      operationId: onInferenceCompleted
+      summary: Inbound inference callback
+      description: >
+        Callback sent by DEVUP AI to the consumer's `webhook` URL once an asynchronous
+        native inference request completes or fails.
+
+        Delivery is attempted once and is not retried.
+      parameters:
+        - name: X-DevUp-Signature
+          in: header
+          required: true
+          description: >
+            HMAC signature for verifying webhook authenticity, formatted as
+            `t=<unix>,v1=<hex>[,v1=<hex>]`.
+          schema:
+            type: string
+          example: t=1700000000,v1=52570827e5d1abac6548068a473c78f16168a2e78e097a9ac1fbb6c79cf68e55
+        - name: X-DevUp-Delivery-Id
+          in: header
+          required: true
+          description: Unique webhook delivery identifier.
+          schema:
+            type: string
+          example: whd_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+        - name: User-Agent
+          in: header
+          required: true
+          description: Webhook sender user agent header.
+          schema:
+            type: string
+          example: DevUp-Webhook/1.0
+      requestBody:
+        required: true
+        description: >
+          Inbound delivery payload containing inference results or failure details.
+          `results` and `error` are mutually exclusive.
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  title: WebhookSuccessPayload
+                  description: Delivered when asynchronous inference succeeds.
+                  required:
+                    - id
+                    - status
+                    - usage
+                    - cost_dzd
+                    - settlement
+                    - results
+                  properties:
+                    id:
+                      type: string
+                      description: Webhook delivery identifier (`whd_<uuid>`).
+                    status:
+                      type: string
+                      enum: [succeeded]
+                      description: Status indicating successful inference.
+                    usage:
+                      type: object
+                      description: Token consumption for the completed inference.
+                      required: [prompt_tokens, completion_tokens]
+                      properties:
+                        prompt_tokens:
+                          type: integer
+                          description: Number of prompt tokens processed.
+                        completion_tokens:
+                          type: integer
+                          description: Number of completion tokens generated.
+                    cost_dzd:
+                      type: number
+                      format: double
+                      description: Final settled cost in Algerian Dinar (DZD).
+                    settlement:
+                      type: string
+                      enum: [settled]
+                      description: Billing settlement status.
+                    results:
+                      type: array
+                      description: Model execution results.
+                      items:
+                        type: object
+                        additionalProperties: true
+                - type: object
+                  title: WebhookFailurePayload
+                  description: Delivered when asynchronous inference fails.
+                  required:
+                    - id
+                    - status
+                    - usage
+                    - cost_dzd
+                    - settlement
+                    - error
+                  properties:
+                    id:
+                      type: string
+                      description: Webhook delivery identifier (`whd_<uuid>`).
+                    status:
+                      type: string
+                      enum: [failed]
+                      description: Status indicating failed inference.
+                    usage:
+                      type: object
+                      description: Token consumption (0 tokens on failure).
+                      required: [prompt_tokens, completion_tokens]
+                      properties:
+                        prompt_tokens:
+                          type: integer
+                          description: Number of prompt tokens processed (0 on failure).
+                        completion_tokens:
+                          type: integer
+                          description: Number of completion tokens generated (0 on failure).
+                    cost_dzd:
+                      type: [number, "null"]
+                      format: double
+                      description: Settled cost in DZD (`null` on failure).
+                    settlement:
+                      type: string
+                      enum: [failed]
+                      description: Billing settlement status.
+                    error:
+                      type: object
+                      description: Details of the failure.
+                      required: [type, message]
+                      properties:
+                        type:
+                          type: string
+                          description: Error classification code.
+                        message:
+                          type: string
+                          description: Human-readable failure explanation.
+            examples:
+              success:
+                summary: Successful inference callback
+                value:
+                  id: whd_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+                  status: succeeded
+                  usage:
+                    prompt_tokens: 1
+                    completion_tokens: 249
+                  cost_dzd: 6.6282
+                  settlement: settled
+                  results:
+                    - output: Example model output
+              failure:
+                summary: Failed inference callback
+                value:
+                  id: whd_9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+                  status: failed
+                  usage:
+                    prompt_tokens: 0
+                    completion_tokens: 0
+                  cost_dzd: null
+                  settlement: failed
+                  error:
+                    type: inference_failed
+                    message: The inference request did not complete successfully.
+      responses:
+        '200':
+          description: Acknowledge receipt of the webhook. The consumer must return a 2xx HTTP status code.
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Components
+# ═══════════════════════════════════════════════════════════════════════════
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: >
+        API key passed as a Bearer token in the Authorization header.
+        Obtain your key from the DEVUP AI Dashboard.
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Shared response refs
+  # ─────────────────────────────────────────────────────────────────────────
+  responses:
+    BadRequest:
+      description: Invalid request body or parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              message: 'The "model" field is required.'
+              type: devup_error
+              code: missing_model
+    Unauthorized:
+      description: |
+        Missing, empty, or revoked API key.
+        This response covers three distinct codes depending on the authentication path:
+        - `missing_api_key`: Authorization header absent or Bearer token is empty.
+        - `invalid_api_key`: Key not found, deactivated, or failed validation.
+        - `token_revoked`: The scoped JWT credential has been explicitly revoked.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_api_key:
+              summary: Authorization header absent or empty Bearer token
+              value:
+                error:
+                  message: "Provide your API key as: Authorization: Bearer sk-devup-..."
+                  type: devup_error
+                  code: missing_api_key
+            invalid_api_key:
+              summary: Key not found, deactivated, or failed validation
+              value:
+                error:
+                  message: "The API key provided is invalid or has been deactivated."
+                  type: devup_error
+                  code: invalid_api_key
+            token_revoked:
+              summary: Scoped JWT credential has been explicitly revoked (scoped-token auth only)
+              value:
+                error:
+                  message: "This scoped token has been revoked."
+                  type: devup_error
+                  code: token_revoked
+    Forbidden:
+      description: |
+        Account suspended or scoped credential does not permit the requested model.
+        - `account_suspended`: The DEVUP account is suspended; all requests are blocked.
+        - `model_not_allowed`: The scoped credential does not grant access to the requested model.
+          This code is never returned for unrestricted master API keys.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            account_suspended:
+              summary: DEVUP account is suspended
+              value:
+                error:
+                  message: "Account suspended. Contact support."
+                  type: devup_error
+                  code: account_suspended
+            model_not_allowed:
+              summary: Scoped credential does not permit the requested model (scoped-token auth only)
+              value:
+                error:
+                  message: "This scoped token does not grant access to the requested model."
+                  type: devup_error
+                  code: model_not_allowed
+    InsufficientBalance:
+      description: |
+        DZD balance depleted or scoped credential budget exhausted.
+        - `insufficient_balance`: The DEVUP account has insufficient available balance.
+        - `budget_exhausted`: The scoped credential has reached its configured budget.
+          This code is never returned for unrestricted master API keys.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            insufficient_balance:
+              summary: DEVUP account has insufficient available balance
+              value:
+                error:
+                  message: "Your balance is depleted. Top up at https://devupai.com/dashboard/billing."
+                  type: devup_error
+                  code: insufficient_balance
+            budget_exhausted:
+              summary: Scoped credential budget exhausted (scoped-token auth only)
+              value:
+                error:
+                  message: "Scoped token budget has been exhausted."
+                  type: devup_error
+                  code: budget_exhausted
+    RateLimited:
+      description: Rate limit exceeded (100 requests per 60-second sliding window per account).
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Maximum requests allowed in the current window.
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests in the current window.
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Unix timestamp (ms) when the current window resets.
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until the rate limit resets.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              message: "Rate limit exceeded. Please slow down your requests and try again shortly."
+              type: devup_error
+              code: rate_limit_exceeded
+    ComputeError:
+      description: The inference pipeline encountered a transient error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              message: "The DEVUP AI Inference Pipeline encountered a transient error. Please retry your request."
+              type: devup_error
+              code: DEVUP_COMPUTE_ERROR
+    InternalError:
+      description: An unexpected internal error occurred.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              message: Internal server error.
+              type: devup_error
+              code: internal_error
+    ServiceUnavailable:
+      description: The DEVUP AI Gateway is temporarily unable to process requests (rate-limiter backend unavailable).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              message: The DEVUP AI Gateway is temporarily unable to process requests. Please try again shortly.
+              type: devup_error
+              code: service_unavailable
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Schemas
+  # ─────────────────────────────────────────────────────────────────────────
+  schemas:
+    # ── Shared ──
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [message, type, code]
+          properties:
+            message:
+              type: string
+              description: Human-readable error description.
+            type:
+              type: string
+              enum: [devup_error]
+              description: Always `devup_error`.
+            code:
+              type: string
+              description: Machine-readable error code.
+
+    DevUpBilling:
+      type: object
+      description: >
+        Billing metadata embedded in successful metered API JSON responses and
+        in the final chunk of SSE chat streams. Excluded from raw binary
+        responses, Audio Transcriptions, and free utility endpoints.
+      required:
+        - cost_dzd
+        - balance_dzd
+      properties:
+        cost_dzd:
+          type: number
+          format: double
+          description: Cost of this request in Algerian Dinar.
+          example: 0.0012
+        balance_dzd:
+          type: number
+          format: double
+          description: Remaining account balance in Algerian Dinar after this request.
+          example: 499.99
+
+    # ── Chat ──
+    ChatCompletionRequest:
+      type: object
+      required: [model, messages]
+      properties:
+        model:
+          type: string
+          description: Model identifier (e.g., `deepseek-ai/DeepSeek-V4-Pro`).
+        messages:
+          type: array
+          maxItems: 512
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+          description: The conversation history.
+        max_tokens:
+          type: integer
+          minimum: 1
+          maximum: 32768
+          description: Maximum tokens to generate in the response.
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          description: Sampling temperature (0–2).
+        top_p:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Nucleus sampling probability.
+        stream:
+          type: boolean
+          default: false
+          description: If true, returns an SSE stream of partial completions.
+        stop:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          description: Stop sequence(s) to end generation.
+        frequency_penalty:
+          type: number
+          description: Penalizes repeated tokens based on frequency.
+        presence_penalty:
+          type: number
+          description: Penalizes tokens based on presence in the text so far.
+        tools:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: A list of tools (functions) the model may call.
+        tool_choice:
+          oneOf:
+            - type: string
+            - type: object
+              additionalProperties: true
+          description: Controls which tool is called by the model.
+        response_format:
+          type: object
+          additionalProperties: true
+          description: Response format constraint (e.g., `{"type":"json_object"}`).
+
+    ChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant, tool]
+          description: The role of the message author.
+        content:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: object
+                additionalProperties: true
+            - type: "null"
+          description: |
+            The message content (text or multimodal content parts).
+            Assistant tool-call messages may contain content: null.
+        name:
+          type: string
+          description: Optional name for the participant.
+        tool_calls:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: Tool calls generated by the assistant.
+        tool_call_id:
+          type: string
+          description: ID of the tool call this message responds to.
+
+    ChatCompletionResponse:
+      type: object
+      required: [id, object, created, model, choices, _devup]
+      properties:
+        id:
+          type: string
+          description: Unique response identifier.
+        object:
+          type: string
+          enum: [chat.completion]
+        created:
+          type: integer
+          description: Unix timestamp of the response.
+        model:
+          type: string
+          description: The model used.
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              message:
+                $ref: '#/components/schemas/ChatMessage'
+              finish_reason:
+                type: string
+                enum: [stop, length, tool_calls, content_filter]
+        usage:
+          $ref: '#/components/schemas/TokenUsage'
+        _devup:
+          $ref: '#/components/schemas/DevUpBilling'
+
+    TokenUsage:
+      type: object
+      properties:
+        prompt_tokens:
+          type: integer
+          description: Tokens in the prompt.
+        completion_tokens:
+          type: integer
+          description: Tokens in the generated completion.
+        total_tokens:
+          type: integer
+          description: Total tokens used.
+        prompt_tokens_details:
+          type: object
+          properties:
+            cached_tokens:
+              type: integer
+              description: Number of prompt tokens served from cache.
+
+    # ── Embeddings ──
+    EmbeddingRequest:
+      type: object
+      required: [model, input]
+      properties:
+        model:
+          type: string
+          description: Embedding model identifier.
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              maxItems: 2048
+              items:
+                type: string
+          description: Text or array of texts to embed.
+        encoding_format:
+          type: string
+          enum: [float, base64]
+          default: float
+          description: Format of the embedding vectors.
+
+    EmbeddingResponse:
+      type: object
+      required: [object, data, model, _devup]
+      properties:
+        object:
+          type: string
+          enum: [list]
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              object:
+                type: string
+                enum: [embedding]
+              index:
+                type: integer
+              embedding:
+                type: array
+                items:
+                  type: number
+                description: The embedding vector.
+        model:
+          type: string
+        usage:
+          type: object
+          properties:
+            prompt_tokens:
+              type: integer
+            total_tokens:
+              type: integer
+        _devup:
+          $ref: '#/components/schemas/DevUpBilling'
+
+    # ── Reranking ──
+    RerankRequest:
+      type: object
+      required: [model, query, documents]
+      properties:
+        model:
+          type: string
+          description: Reranker model identifier.
+        query:
+          type: string
+          description: The semantic search query.
+        documents:
+          type: array
+          items:
+            type: string
+          description: A list of text documents to rerank.
+        top_n:
+          type: integer
+          description: The number of top documents to return. Defaults to the length of the documents array.
+        return_documents:
+          type: boolean
+          default: false
+          description: Whether to include the original document text in the response.
+
+    RerankResponse:
+      type: object
+      required: [object, model, results, _devup]
+      properties:
+        object:
+          type: string
+          enum: [list]
+        model:
+          type: string
+        results:
+          type: array
+          items:
+            type: object
+            required: [index, relevance_score]
+            properties:
+              index:
+                type: integer
+                description: The index of the document in the original request array.
+              relevance_score:
+                type: number
+                description: The semantic relevance score for the document.
+              document:
+                type: string
+                description: The original document text (only included if return_documents is true).
+        _devup:
+          $ref: '#/components/schemas/DevUpBilling'
+
+    # ── Images ──
+    ImageEditRequest:
+      type: object
+      required: [model]
+      description: |
+        Request schema for image editing via `multipart/form-data`.
+        Unknown multipart fields may be forwarded transparently to the upstream provider depending on the specific model endpoint requirements.
+      properties:
+        model:
+          type: string
+          description: Image generation model identifier.
+        prompt:
+          type: string
+          description: Text description of the desired image edits. Forwarded transparently.
+        image:
+          type: string
+          format: binary
+          description: Base image to edit. Forwarded transparently.
+        mask:
+          type: string
+          format: binary
+          description: Optional mask for inpainting. Forwarded transparently.
+        size:
+          type: string
+          default: 1024x1024
+          description: "Image dimensions (e.g., `1024x1024`, `512x512`). Forwarded transparently."
+        n:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+          description: Number of images to generate.
+
+    ImageGenerationRequest:
+      type: object
+      required: [model, prompt]
+      properties:
+        model:
+          type: string
+          description: Image generation model identifier.
+        prompt:
+          type: string
+          description: Text description of the desired image.
+        negative_prompt:
+          type: string
+          description: Text description of what to avoid in the image.
+        size:
+          type: string
+          default: 1024x1024
+          description: "Image dimensions (e.g., `1024x1024`, `512x512`)."
+        n:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+          description: Number of images to generate.
+        width:
+          type: integer
+          description: Image width in pixels (alternative to `size`).
+        height:
+          type: integer
+          description: Image height in pixels (alternative to `size`).
+        num_inference_steps:
+          type: integer
+          description: Number of diffusion steps.
+        guidance_scale:
+          type: number
+          description: Classifier-free guidance scale.
+        seed:
+          type: integer
+          description: Random seed for reproducibility.
+
+    ImageGenerationResponse:
+      type: object
+      required: [data, _devup]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              url:
+                type: string
+                format: uri
+                description: URL of the generated image.
+        _devup:
+          $ref: '#/components/schemas/DevUpBilling'
+
+    # ── Audio: Speech ──
+    SpeechRequest:
+      type: object
+      required: [model, input]
+      properties:
+        model:
+          type: string
+          description: TTS model identifier.
+        input:
+          type: string
+          description: The text to synthesize into speech.
+        voice:
+          type: string
+          default: aura-asteria-en
+          description: Voice preset to use.
+        response_format:
+          type: string
+          enum: [mp3, opus, aac, flac, wav, pcm]
+          default: mp3
+          description: Audio output format.
+        referenceAudioUrl:
+          type: string
+          format: uri
+          description: |
+            Public HTTPS URL to a reference audio file for voice cloning.
+            Required only when the selected model uses voice-cloning mode (AUDIO_REFERENCE).
+            Validated against SSRF rules before any fetch — must be a publicly reachable HTTPS URL.
+            Ignored by models that do not support AUDIO_REFERENCE.
+
+    SpeechResponse:
+      type: object
+      required: [url, _devup]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: URL of the generated audio file.
+        _devup:
+          $ref: '#/components/schemas/DevUpBilling'
+
+    # ── Audio: Transcription ──
+    TranscriptionRequest:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+          description: The audio file to transcribe (multipart file upload).
+        model:
+          type: string
+          default: openai/whisper-large-v3-turbo
+          description: Speech recognition model identifier.
+        language:
+          type: string
+          description: ISO-639-1 language code to hint the recognizer.
+        response_format:
+          type: string
+          enum: [json, verbose_json, text, srt, vtt]
+          default: json
+          description: |
+            Format of the transcription response. The route always requests `verbose_json`
+            from the upstream provider internally (for accurate billing and segment data),
+            then converts to the client-requested format before returning.
+            Unknown values default to `json`. `text`, `srt`, and `vtt` are returned as
+            `text/plain`; `json` and `verbose_json` are returned as `application/json`.
+
+    TranscriptionResponse:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          description: The transcribed text.
+
+    TranscriptionVerboseResponse:
+      type: object
+      required: [text, duration, segments]
+      properties:
+        text:
+          type: string
+          description: The transcribed text.
+        duration:
+          type: number
+          description: Total audio duration in seconds.
+        segments:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    # ── Video ──
+    VideoGenerationRequest:
+      type: object
+      required: [model, prompt]
+      properties:
+        model:
+          type: string
+          description: Video generation model identifier.
+        prompt:
+          type: string
+          description: Text description of the desired video.
+        negative_prompt:
+          type: string
+          description: Text description of what to avoid.
+        num_frames:
+          type: integer
+          description: Number of frames to generate.
+        width:
+          type: integer
+          description: Video width in pixels.
+        height:
+          type: integer
+          description: Video height in pixels.
+        seed:
+          type: integer
+          description: Random seed for reproducibility.
+
+    VideoEditRequest:
+      type: object
+      required: [model, video]
+      properties:
+        model:
+          type: string
+          description: Video editing model identifier.
+        video:
+          type: string
+          format: binary
+          description: Source video file for editing.
+        prompt:
+          type: string
+          description: Text prompt describing the edit (required for text_prompt mode).
+        mask:
+          type: string
+          format: binary
+          description: Mask video for region-based editing (mask_video mode).
+        mask_url:
+          type: string
+          format: uri
+          description: Public HTTPS URL to the mask video (alternative to uploading mask binary).
+        key_points:
+          type: string
+          description: |
+            JSON-encoded string representing an array of key-point objects for key_points mode.
+            Each object must have numeric `x`, `y` coordinates and a `type` of either `"positive"` or `"negative"`.
+            Example: `"[{\"x\":100,\"y\":200,\"type\":\"positive\"}]"`
+            The route calls JSON.parse() on this field before forwarding.
+        frame_index:
+          type: integer
+          default: 0
+          description: Frame index for key_points editing mode.
+        auto_trim:
+          type: boolean
+          default: false
+          description: Whether to auto-trim the output video.
+        preserve_audio:
+          type: boolean
+          default: true
+          description: Whether to preserve the original audio track in the output.
+        background_color:
+          type: string
+          default: White
+          description: Background fill color (background_color mode). CSS color name or hex value.
+        desired_increase:
+          type: integer
+          enum: [2, 4]
+          default: 2
+          description: Upscale factor for upscale_factor mode. Only 2 or 4 are accepted; other values are coerced to 2.
+        output_container_and_codec:
+          type: string
+          description: Output container and codec string forwarded to the upstream provider.
+
+
+
+    VideoGenerationResponse:
+      type: object
+      required: [data, _devup]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required: [url]
+            properties:
+              url:
+                type: string
+                format: uri
+                description: URL of the generated or edited video.
+        _devup:
+          $ref: '#/components/schemas/DevUpBilling'
+
+    # ── Models ──
+    ModelListResponse:
+      type: object
+      required: [object, data]
+      properties:
+        object:
+          type: string
+          enum: [list]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelObject'
+
+    ModelObject:
+      type: object
+      required: [id, object, created, owned_by]
+      properties:
+        id:
+          type: string
+          description: Model identifier (slug or provider model ID).
+        object:
+          type: string
+          enum: [model]
+        created:
+          type: integer
+          description: Unix timestamp of model creation.
+        owned_by:
+          type: string
+          enum: [devupai]
+
+    # ── Account ──
+    BalanceResponse:
+      type: object
+      required: [balance_dzd]
+      properties:
+        balance_dzd:
+          type: number
+          format: double
+          description: Current account balance in Algerian Dinar (DZD).
+
+    # ── Health ──
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+          description: Platform health status.

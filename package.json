@@ -67,7 +67,8 @@
     "dev": "tsup --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "generate:provenance": "node scripts/generate-openapi-provenance.mjs"
   },
   "devDependencies": {
     "@ai-sdk/openai-compatible": "^2.0.50",
