@@ -1,11 +1,28 @@
 import type { components } from "./internal/openapi-schema";
 
-export type ChatCompletion = components['schemas']['ChatCompletionResponse'];
 export type DevUpBilling = components['schemas']['DevUpBilling'];
+
+export type ChatCompletionMessage = components['schemas']['ChatMessage'] & {
+    reasoning_content?: string | null;
+};
+
+export type ChatCompletionChoice = Omit<components['schemas']['ChatCompletionResponse']['choices'][number], 'message'> & {
+    message?: ChatCompletionMessage;
+};
+
+export type TokenUsage = components['schemas']['TokenUsage'] & {
+    reasoning_tokens?: number;
+};
+
+export type ChatCompletion = Omit<components['schemas']['ChatCompletionResponse'], 'choices' | 'usage'> & {
+    choices: ChatCompletionChoice[];
+    usage?: TokenUsage;
+};
 
 export interface ChatCompletionChunkDelta {
     role?: "system" | "user" | "assistant" | "tool";
     content?: string | null;
+    reasoning_content?: string | null;
     tool_calls?: unknown[];
 }
 

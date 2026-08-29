@@ -3,6 +3,8 @@
 ## [3.1.0] - Unreleased
 
 ### Added
+- **Reasoning Fields in Chat & Streaming:** Added `reasoning_content?: string | null` to `ChatCompletionMessage` and `ChatCompletionChunkDelta`, exposing model thinking traces in both non-streaming and streaming chat completions.
+- **Reasoning Tokens in Usage:** Added `reasoning_tokens?: number` to `TokenUsage`, supporting token accounting for providers that return reasoning token breakdowns.
 - **Webhook Signature Verification:** Added `verifyWebhookSignature()` and `constructWebhookEvent()` standalone helpers alongside `client.webhooks` resource namespace for verifying inbound DEVUP AI webhook delivery callbacks. Implemented with Web Crypto API (`crypto.subtle`) for zero-dependency compatibility across Node.js 18+, Edge runtimes, Cloudflare Workers, Deno, Bun, and browsers.
 - **`DevupWebhookVerificationError` Class:** Exported dedicated verification error class with granular `reason` codes (`malformed_header`, `timestamp_outside_tolerance`, `no_matching_signature`, `invalid_json`).
 - **Webhook Payload Types:** Exported `WebhookEvent`, `WebhookSuccessPayload`, `WebhookErrorPayload`, and `WebhookUsage` interfaces.

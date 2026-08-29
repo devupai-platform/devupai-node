@@ -253,6 +253,66 @@ streamResponse().catch(console.error);
 
 ---
 
+## Reasoning and Thinking Output
+
+Reasoning models may return internal thinking traces via `reasoning_content` on the message object, along with optional `reasoning_tokens` in `usage`.
+
+```typescript
+import DevupAI from "devupai";
+
+const client = new DevupAI({
+  apiKey: process.env.DEVUP_API_KEY!,
+});
+
+async function runReasoning() {
+  // WARNING: Set max_tokens high enough to accommodate BOTH reasoning trace and final answer.
+  // In testing, Qwen/Qwen3-14B with max_tokens: 600 exhausted its token budget during generation,
+  // returning finish_reason: "length" with reasoning_content: null and a truncated answer,
+  // while the request was fully billed. Always check finish_reason.
+  const response = await client.chat.completions.create({
+    model: "inclusionAI/Ling-3.0-flash",
+    messages: [
+      {
+        role: "user",
+        content: "Prove whether 3571 is a prime number.",
+      },
+    ],
+    max_tokens: 2048,
+  });
+
+  const choice = response.choices[0];
+  if (!choice) return;
+
+  // Guard against truncated generation when token budget is exhausted
+  if (choice.finish_reason === "length") {
+    console.warn("Generation truncated: token limit reached before completion.");
+  }
+
+  // reasoning_content is populated by some providers and null for others
+  if (choice.message?.reasoning_content) {
+    console.log("Reasoning trace:\n", choice.message.reasoning_content);
+  }
+
+  console.log("Answer:\n", choice.message?.content);
+
+  // reasoning_tokens is optional (returned by 1 of 5 tested providers)
+  if (response.usage?.reasoning_tokens !== undefined) {
+    console.log("Reasoning tokens:", response.usage.reasoning_tokens);
+  }
+
+  // prompt_tokens_details can be null or omitted depending on provider
+  if (response.usage?.prompt_tokens_details?.cached_tokens) {
+    console.log("Cached prompt tokens:", response.usage.prompt_tokens_details.cached_tokens);
+  }
+
+  console.log("Cost:", response._devup?.cost_dzd, "DZD");
+}
+
+runReasoning().catch(console.error);
+```
+
+---
+
 ## Images
 
 <details open>

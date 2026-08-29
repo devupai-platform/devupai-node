@@ -832,7 +832,10 @@ webhooks:
         Callback sent by DEVUP AI to the consumer's `webhook` URL once an asynchronous
         native inference request completes or fails.
 
-        Delivery is attempted once and is not retried.
+        Delivery is queued and first attempted within about a minute of completion.
+        Failed deliveries are retried up to 8 times over roughly one hour on HTTP 408,
+        429, 5xx status codes, timeouts, and network errors. Other 4xx responses (such
+        as 401 or 404) fail immediately without retry.
       parameters:
         - name: X-DevUp-Signature
           in: header
@@ -1287,6 +1290,12 @@ components:
           description: |
             The message content (text or multimodal content parts).
             Assistant tool-call messages may contain content: null.
+        reasoning_content:
+          type: [string, "null"]
+          description: >
+            The model's reasoning trace when the model produces one; null
+            otherwise. Populated by some reasoning models only — a consumer
+            must not assume it carries content.
         name:
           type: string
           description: Optional name for the participant.
@@ -1345,12 +1354,24 @@ components:
         total_tokens:
           type: integer
           description: Total tokens used.
+        reasoning_tokens:
+          type: integer
+          description: >
+            Tokens consumed by the model's reasoning trace. Returned by some
+            providers only (measured on 1 of 5 providers). Consumers must check
+            for its presence rather than assume it.
         prompt_tokens_details:
-          type: object
+          type: [object, "null"]
+          description: >
+            Breakdown of prompt token consumption. Nullable because some
+            providers omit this object entirely.
           properties:
             cached_tokens:
               type: integer
               description: Number of prompt tokens served from cache.
+            cache_write_tokens:
+              type: [integer, "null"]
+              description: Number of prompt tokens written to cache. May be null.
 
     # ── Embeddings ──
     EmbeddingRequest:
