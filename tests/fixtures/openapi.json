@@ -495,6 +495,9 @@
           "402": {
             "$ref": "#/components/responses/InsufficientBalance"
           },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
           "429": {
             "$ref": "#/components/responses/RateLimited"
           },
@@ -693,6 +696,9 @@
           "402": {
             "$ref": "#/components/responses/InsufficientBalance"
           },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
           "429": {
             "$ref": "#/components/responses/RateLimited"
           },
@@ -767,6 +773,9 @@
           "402": {
             "$ref": "#/components/responses/InsufficientBalance"
           },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
           "429": {
             "$ref": "#/components/responses/RateLimited"
           },
@@ -836,6 +845,9 @@
           },
           "402": {
             "$ref": "#/components/responses/InsufficientBalance"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "429": {
             "description": "Rate limit or concurrency limit exceeded. This endpoint applies two independent limits: (1) 100 requests per 60-second sliding window per account — returns standard rate-limit headers. (2) 150 globally in-flight video generation requests — when this threshold is exceeded, a 429 is returned with Retry-After: 5 and retry-after-ms: 5000 and no rate-limit headers.\n",

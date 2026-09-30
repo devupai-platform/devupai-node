@@ -1148,6 +1148,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["RateLimited"];
             502: components["responses"]["ComputeError"];
             503: components["responses"]["ServiceUnavailable"];
@@ -1263,6 +1264,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["RateLimited"];
             502: components["responses"]["ComputeError"];
             503: components["responses"]["ServiceUnavailable"];
@@ -1308,6 +1310,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["RateLimited"];
             502: components["responses"]["ComputeError"];
             503: components["responses"]["ServiceUnavailable"];
@@ -1358,6 +1361,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
+            404: components["responses"]["NotFound"];
             /** @description Rate limit or concurrency limit exceeded. This endpoint applies two independent limits: (1) 100 requests per 60-second sliding window per account — returns standard rate-limit headers. (2) 150 globally in-flight video generation requests — when this threshold is exceeded, a 429 is returned with Retry-After: 5 and retry-after-ms: 5000 and no rate-limit headers. */
             429: {
                 headers: {
