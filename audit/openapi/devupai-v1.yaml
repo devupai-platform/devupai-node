@@ -595,12 +595,16 @@ paths:
             This endpoint applies two independent limits:
             (1) 100 requests per 60-second sliding window per account — returns standard rate-limit headers.
             (2) 150 globally in-flight video generation requests — when this threshold is exceeded, a 429
-            is returned with Retry-After: 10 and no rate-limit headers.
+            is returned with Retry-After: 5 and retry-after-ms: 5000 and no rate-limit headers.
           headers:
             Retry-After:
               schema:
                 type: integer
-              description: Seconds to wait before retrying (10 for concurrency limit; varies for rate limit).
+              description: Seconds to wait before retrying (5 for model at capacity; varies for rate limit).
+            retry-after-ms:
+              schema:
+                type: integer
+              description: Milliseconds to wait before retrying (model_at_capacity only).
           content:
             application/json:
               schema:
@@ -617,9 +621,9 @@ paths:
                   summary: Global in-flight video limit (150) exceeded
                   value:
                     error:
-                      message: Too many concurrent video generation requests, please retry shortly.
+                      message: This model is currently at capacity. Retry in a few seconds.
                       type: devup_error
-                      code: rate_limit_exceeded
+                      code: model_at_capacity
         '502':
           $ref: '#/components/responses/ComputeError'
         '503':
