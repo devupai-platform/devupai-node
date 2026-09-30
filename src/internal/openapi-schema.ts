@@ -824,21 +824,25 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description The DEVUP AI Gateway is temporarily unable to process requests (rate-limiter backend unavailable). */
-        ServiceUnavailable: {
+        /** @description The requested model identifier was not found in the catalog. It is not retryable unless the model identifier is changed. */
+        NotFound: {
             headers: {
                 [name: string]: unknown;
             };
             content: {
-                /**
-                 * @example {
-                 *       "error": {
-                 *         "message": "The DEVUP AI Gateway is temporarily unable to process requests. Please try again shortly.",
-                 *         "type": "devup_error",
-                 *         "code": "service_unavailable"
-                 *       }
-                 *     }
-                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Requests are temporarily paused or the requested model is temporarily unavailable. Retry according to the delay communicated in Retry-After and/or retry-after-ms when present. */
+        ServiceUnavailable: {
+            headers: {
+                /** @description Seconds to wait before retrying. */
+                "Retry-After"?: number;
+                /** @description Milliseconds to wait before retrying. */
+                "retry-after-ms"?: number;
+                [name: string]: unknown;
+            };
+            content: {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
@@ -924,6 +928,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["RateLimited"];
             502: components["responses"]["ComputeError"];
             503: components["responses"]["ServiceUnavailable"];
@@ -994,6 +999,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["RateLimited"];
             502: components["responses"]["ComputeError"];
             503: components["responses"]["ServiceUnavailable"];
@@ -1469,6 +1475,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["RateLimited"];
             502: components["responses"]["ComputeError"];
             503: components["responses"]["ServiceUnavailable"];

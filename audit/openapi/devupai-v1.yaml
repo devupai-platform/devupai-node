@@ -136,6 +136,8 @@ paths:
           $ref: '#/components/responses/InsufficientBalance'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/RateLimited'
         '502':
@@ -209,6 +211,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '402':
           $ref: '#/components/responses/InsufficientBalance'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/RateLimited'
         '502':
@@ -759,6 +763,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '402':
           $ref: '#/components/responses/InsufficientBalance'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/RateLimited'
         '502':
@@ -1155,17 +1161,54 @@ components:
               message: Internal server error.
               type: devup_error
               code: internal_error
-    ServiceUnavailable:
-      description: The DEVUP AI Gateway is temporarily unable to process requests (rate-limiter backend unavailable).
+    NotFound:
+      description: >
+        The requested model identifier was not found in the catalog.
+        It is not retryable unless the model identifier is changed.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              message: The DEVUP AI Gateway is temporarily unable to process requests. Please try again shortly.
-              type: devup_error
-              code: service_unavailable
+          examples:
+            model_not_found:
+              summary: Model not found in catalog
+              value:
+                error:
+                  message: "The requested model was not found."
+                  type: devup_error
+                  code: model_not_found
+    ServiceUnavailable:
+      description: >
+        Requests are temporarily paused or the requested model is temporarily unavailable.
+        Retry according to the delay communicated in Retry-After and/or retry-after-ms when present.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying.
+        retry-after-ms:
+          schema:
+            type: integer
+          description: Milliseconds to wait before retrying.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            service_unavailable:
+              summary: Requests are paused for a few seconds
+              value:
+                error:
+                  message: Requests are paused for a few seconds. Retry after the delay in the Retry-After header.
+                  type: devup_error
+                  code: service_unavailable
+            model_unavailable:
+              summary: The requested model is temporarily unavailable
+              value:
+                error:
+                  message: "The requested model is temporarily unavailable. Retry shortly."
+                  type: devup_error
+                  code: model_unavailable
 
   # ─────────────────────────────────────────────────────────────────────────
   # Schemas
