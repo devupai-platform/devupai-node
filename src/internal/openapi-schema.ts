@@ -1069,24 +1069,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
             403: components["responses"]["Forbidden"];
-            /** @description Model not found. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "error": {
-                     *         "message": "Model \"unknown-model\" not found.",
-                     *         "type": "devup_error",
-                     *         "code": "model_not_found"
-                     *       }
-                     *     }
-                     */
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
+            404: components["responses"]["NotFound"];
             429: components["responses"]["RateLimited"];
             502: components["responses"]["ComputeError"];
             503: components["responses"]["ServiceUnavailable"];
