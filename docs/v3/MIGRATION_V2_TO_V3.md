@@ -2,16 +2,16 @@
 
 DEVUP AI SDK V3 is a major release that strictly aligns the SDK with the official OpenAPI contract. It brings full TypeScript support for all production API features, improved error handling, and robust Vercel AI SDK integration.
 
-## 1. Native Inference Route Replaces `reranking`
+## 1. Native Inference Replaces `reranking`
 The standalone `reranking` resource has been removed, as it is obsolete.
 To use specialized and reranking models, use the `inference` resource:
 
 ```typescript
 // V2
-await client.reranking.create({ model: 'devup-rerank-v1', query: 'q', documents: ['d'] });
+await client.reranking.create({ model: '<reranker-model-id>', query: 'q', documents: ['d'] });
 
 // V3
-await client.inference.run('example-org/example-reranker-model', { query: 'q', documents: ['d'] });
+await client.inference.run('<reranker-model-id>', { query: 'q', documents: ['d'] });
 ```
 
 ## 2. Updated DevupAPIError
@@ -34,17 +34,20 @@ try {
 }
 ```
 
-## 3. `health` and `images.proxy` are Now Public
-You can now explicitly check system health and proxy remote image URLs directly via the SDK.
+## 3. `health.check()` and `images.proxy()` Are Available
+You can now check service health, and fetch a generated image from a URL returned by the API.
 Note that the `images.proxy` returns a native `Response` object instead of an ArrayBuffer.
 
 ```typescript
 const health = await client.health.check();
 
-const proxyResponse = await client.images.proxy({ url: 'https://example.com/image.jpg' });
-const contentType = proxyResponse.headers.get("content-type");
-const imageBuffer = await proxyResponse.arrayBuffer();
+// `imageUrl` is a `data[].url` value returned by `client.images.generate()`.
+const imageResponse = await client.images.proxy({ url: imageUrl });
+const contentType = imageResponse.headers.get("content-type");
+const imageBuffer = await imageResponse.arrayBuffer();
 ```
+
+> In 4.0.0 the method is renamed and takes the URL string itself: `client.images.download(imageUrl)`. See `MIGRATION_V3_TO_V4.md`.
 
 ## 4. `audio.speech` Returns JSON (Not Raw Buffer)
 The contract specifies that `/audio/speech` returns a JSON object containing a URL to the generated audio and billing data, instead of streaming the raw binary.
@@ -52,7 +55,7 @@ The contract specifies that `/audio/speech` returns a JSON object containing a U
 ```typescript
 // V3
 const response = await client.audio.speech.create({
-  model: "kokoro",
+  model: "hexgrad/Kokoro-82M",
   input: "Hello World",
   voice: "af_sky"
 });

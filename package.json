@@ -1,7 +1,7 @@
 {
   "name": "devupai",
-  "version": "3.2.0",
-  "description": "Official Node.js SDK for DEVUP AI — OpenAI-compatible inference gateway with DZD billing",
+  "version": "4.0.0",
+  "description": "Official Node.js SDK for the DEVUP AI platform: an OpenAI-compatible API with DZD billing.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -22,16 +22,13 @@
       "import": {
         "types": "./dist/provider.d.mts",
         "default": "./dist/provider.mjs"
-      },
-      "require": {
-        "types": "./dist/provider.d.ts",
-        "default": "./dist/provider.js"
       }
     }
   },
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "keywords": [
@@ -47,12 +44,20 @@
   ],
   "author": "DEVUP AI",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devupai-platform/devupai-node.git"
+  },
+  "homepage": "https://github.com/devupai-platform/devupai-node#readme",
+  "bugs": {
+    "url": "https://github.com/devupai-platform/devupai-node/issues"
+  },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.12.0"
   },
   "peerDependencies": {
-    "@ai-sdk/openai-compatible": ">=2.0.0 <3.0.0",
-    "@ai-sdk/provider": ">=3.0.0 <4.0.0"
+    "@ai-sdk/openai-compatible": ">=3.0.0 <4.0.0",
+    "@ai-sdk/provider": ">=4.0.0 <5.0.0"
   },
   "peerDependenciesMeta": {
     "@ai-sdk/openai-compatible": {
@@ -63,24 +68,29 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "node scripts/clean-dist.mjs && tsup",
+    "prepack": "npm run build",
     "dev": "tsup --watch",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint .",
-    "generate:provenance": "node scripts/generate-openapi-provenance.mjs"
+    "sync:spec": "node scripts/sync-spec.mjs",
+    "generate:types": "node scripts/generate-types.mjs",
+    "check:types": "node scripts/check-types.mjs"
   },
   "devDependencies": {
-    "@ai-sdk/openai-compatible": "^2.0.50",
-    "@ai-sdk/provider": "^3.0.10",
+    "@ai-sdk/openai-compatible": "^3.0.82",
+    "@ai-sdk/provider": "^4.0.35",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^8.66.0",
     "@typescript-eslint/parser": "^8.66.0",
+    "ai": "^7.0.159",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "devupai-published": "npm:devupai@2.1.3",
     "eslint": "^9.39.5",
     "eslint-plugin-import": "^2.32.0",
+    "js-yaml": "^5.5.0",
     "openapi-typescript": "^7.13.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0",

@@ -15,9 +15,29 @@ export interface paths {
         put?: never;
         /**
          * Create a chat completion
-         * @description Generates a model response for the given conversation. Supports streaming via `stream: true` (SSE). All responses include a `_devup` billing metadata object.
+         * @description Generates a model response for the given conversation. Supports streaming via `stream: true` (SSE). Non-streaming responses include a `_devup` billing metadata object. The request body can be up to 10,485,760 bytes (10 MiB), Base64-encoded image and PDF data included; a larger body returns HTTP 413 `payload_too_large`.
          */
         post: operations["createChatCompletion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a model response
+         * @description Generates a model response using the OpenAI-compatible Responses API. Works with any text model in the catalog; pass its model id as `model`. Set `stream: true` to receive the response as Server-Sent Events. Responses are not stored (`store` is always `false`). A non-streaming request returns a Responses object with a `_devup` billing metadata object.
+         */
+        post: operations["createResponse"];
         delete?: never;
         options?: never;
         head?: never;
@@ -75,7 +95,7 @@ export interface paths {
         put?: never;
         /**
          * Generate images from a text prompt
-         * @description Creates one or more images from a text prompt. Supports JSON and multipart/form-data request bodies. Returns a URL to the generated image hosted on DEVUP AI storage.
+         * @description Creates one or more images from a text prompt. Supports JSON and multipart/form-data request bodies. Returns a temporary download link. The file is deleted automatically after a short period.
          */
         post: operations["createImageGeneration"];
         delete?: never;
@@ -92,8 +112,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Proxy a generated image URL
-         * @description Fetches and proxies an image from a DEVUP AI storage URL. Returns the raw image binary with appropriate caching headers. No authentication required.
+         * Fetch a generated image
+         * @description Fetches a generated image, or a generated video or audio file, from the temporary link returned by the generation endpoints. The response is the file itself. Do not build this URL yourself; use the url value you received. The link expires after a short period: after that, this endpoint returns HTTP 403. Send a `Range` header to fetch part of the file (HTTP 206), for example to seek in a video or audio player. Example: https://api.devupai.com/v1/images/proxy?d=<token>&s=<signature>
          */
         get: operations["proxyImage"];
         put?: never;
@@ -115,7 +135,7 @@ export interface paths {
         put?: never;
         /**
          * Generate speech from text
-         * @description Converts text into spoken audio. The audio file is stored on DEVUP AI storage and a URL is returned. Billed per 1,000 characters.
+         * @description Converts text into spoken audio. Returns a temporary download link. The file is deleted automatically after a short period.
          */
         post: operations["createSpeech"];
         delete?: never;
@@ -173,9 +193,31 @@ export interface paths {
         };
         /**
          * List available models
-         * @description Returns a list of all published models in OpenAI-compatible format. No authentication required. Some OpenAI SDKs call this endpoint automatically on initialization.
+         * @description Returns a list of all published models in OpenAI-compatible format. Requires an API key, sent as `Authorization: Bearer <key>` or in the `x-api-key` header; when both are sent, `Authorization` is used. OpenAI-compatible SDKs send it automatically. The response is sent with `Cache-Control: private, max-age=300` and an `ETag`; send `If-None-Match` to receive `304 Not Modified`. Browser requests may send the `x-api-key` and `anthropic-version` headers.
          */
         get: operations["listModels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/models/{model}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retrieve a model
+         * @description Returns one model: the same model object as that model's entry in `GET /v1/models`. Authentication, `Cache-Control: private, max-age=300` and `ETag` / `If-None-Match` behave as on `GET /v1/models`.
+         *
+         *     The model ID contains a slash and is sent as-is in the path, for example `/v1/models/deepseek-ai/DeepSeek-V4-Pro`. The URL-encoded form `/v1/models/deepseek-ai%2FDeepSeek-V4-Pro` also works. An ID that is not in the catalog returns HTTP 404 `model_not_found`.
+         */
+        get: operations["retrieveModel"];
         put?: never;
         post?: never;
         delete?: never;
@@ -195,7 +237,7 @@ export interface paths {
         put?: never;
         /**
          * Native model inference
-         * @description A catch-all proxy endpoint that forwards any JSON payload to the specified model. The model path uses a `provider/model-name` format (e.g., `deepseek-ai/DeepSeek-V4-Pro`). The request body schema is model-dependent — consult the model's documentation for supported parameters.
+         * @description Sends a JSON payload in the model's own request format to the specified model. The model path uses an `organization/model-name` format (e.g., `deepseek-ai/DeepSeek-V4-Pro`). The request body schema is model-dependent — consult the model's documentation for supported parameters.
          */
         post: operations["createNativeInference"];
         delete?: never;
@@ -216,6 +258,50 @@ export interface paths {
          * @description Returns the current DZD balance for the authenticated user.
          */
         get: operations["getUserBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the account profile
+         * @description Returns the profile of the account that owns the API key: a display name, a one-character initial, a masked email hint and, when the account has a profile picture, the URL and `ETag` of that picture. The response contains exactly these fields and never the full email address.
+         *
+         *     Requires an API key, sent as `Authorization: Bearer <key>` or in the `x-api-key` header; when both are sent, `Authorization` is used. Missing and invalid keys return the same errors as `GET /v1/models`. Only account API keys (`sk-devup-...`) are accepted: a scoped token returns HTTP 403 `scoped_token_not_allowed`. The response is sent with `Cache-Control: private, max-age=300`. The request is not billed and counts against the account's per-minute rate limit.
+         */
+        get: operations["getAccountProfile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the account profile picture
+         * @description Returns the profile picture of the account that owns the API key, as image bytes served directly in the response body (never a redirect). The image is square, at most 256×256 pixels and at most 256 KB (256,000 bytes); `Content-Type` is exactly `image/png`, `image/jpeg` or `image/webp`. The `ETag` equals `avatar.etag` in `GET /v1/me`; send it in `If-None-Match` to receive `304 Not Modified`. The response is sent with `Cache-Control: private, max-age=86400`.
+         *
+         *     An account with no profile picture returns HTTP 404 `avatar_not_found`; `GET /v1/me` then shows `avatar: null`. While the picture is temporarily unavailable, the response is HTTP 503 `service_unavailable` with a `Retry-After` header; request it again after that delay. Authentication is the same as on `GET /v1/me`: account API keys only, and a scoped token returns HTTP 403 `scoped_token_not_allowed`. The request is not billed and counts against the account's per-minute rate limit.
+         */
+        get: operations["getAccountAvatar"];
         put?: never;
         post?: never;
         delete?: never;
@@ -257,8 +343,8 @@ export interface webhooks {
         put?: never;
         /**
          * Inbound inference callback
-         * @description Callback sent by DEVUP AI to the consumer's `webhook` URL once an asynchronous native inference request completes or fails.
-         *     Delivery is queued and first attempted within about a minute of completion. Failed deliveries are retried up to 8 times over roughly one hour on HTTP 408, 429, 5xx status codes, timeouts, and network errors. Other 4xx responses (such as 401 or 404) fail immediately without retry.
+         * @description Callback sent by DEVUP AI to the consumer's `webhook` URL once an asynchronous native inference request has finished, with its results or with error details.
+         *     The first delivery arrives within about a minute of completion. When your endpoint answers HTTP 408, 429 or 5xx, times out, or cannot be reached, the same delivery (same `X-DevUp-Delivery-Id`) is sent again, up to 8 attempts in all over about one hour. Any other 4xx response (such as 401 or 404) ends delivery.
          */
         post: operations["onInferenceCompleted"];
         delete?: never;
@@ -279,31 +365,35 @@ export interface components {
                  * @enum {string}
                  */
                 type: "devup_error";
-                /** @description Machine-readable error code. */
+                /** @description Machine-readable error code. The codes you can act on, their HTTP status and what to do are listed at https://docs.devupai.com/docs/errors. A 400 is not fixed by retrying the same request; a 429, 502 or 503 can be retried after a short wait. */
                 code: string;
             };
         };
-        /** @description Billing metadata embedded in successful metered API JSON responses and in the final chunk of SSE chat streams. Excluded from raw binary responses, Audio Transcriptions, and free utility endpoints. */
+        /** @description Billing metadata embedded in successful metered API JSON responses. Excluded from raw binary responses, plain-text transcriptions (`text`, `srt` and `vtt`), and free utility endpoints. `cost_dzd` and `balance_dzd` always appear together. On chat completions and Responses, a `_devup` without them carries only `request_id` and `warnings`. */
         DevUpBilling: {
             /**
              * Format: double
              * @description Cost of this request in Algerian Dinar.
-             * @example 0.0012
              */
-            cost_dzd: number;
+            cost_dzd?: number;
             /**
              * Format: double
              * @description Remaining account balance in Algerian Dinar after this request.
-             * @example 499.99
              */
-            balance_dzd: number;
+            balance_dzd?: number;
+            /** @description Equal to the `x-request-id` response header. Returned by chat completions, Responses, embeddings, rerank, image generation, speech, transcription, inference and video. */
+            request_id?: string;
+            /** @description Informational notices about how the request was handled. Returned by chat completions and Responses without streaming, only when there is at least one. */
+            warnings?: string[];
+            /** @description `POST /v1/video/generations` only: present when `response_format` is `b64_json` and the video is larger than the size returned inline. The video is then returned as a URL in `data[].url`, and this note says so. */
+            note?: string;
         };
         ChatCompletionRequest: {
             /** @description Model identifier (e.g., `deepseek-ai/DeepSeek-V4-Pro`). */
             model: string;
-            /** @description The conversation history. */
+            /** @description The conversation history. When the last message in the conversation is from the assistant, the model answers with a new assistant message. A model that cannot answer such a conversation returns HTTP 400 `conversation_must_end_with_user` before any charge. */
             messages: components["schemas"]["ChatMessage"][];
-            /** @description Maximum tokens to generate in the response. */
+            /** @description Maximum tokens to generate in the response. The largest accepted value is the model's own `max_output_tokens` in `GET /v1/models`; a larger value (for `max_tokens` or `max_completion_tokens`) returns HTTP 400 `invalid_max_tokens`. When neither is sent, the reply is limited to the model's default output length, which is at most its `max_output_tokens`. Reasoning models spend part of this budget thinking before they answer. With images, audio or video in the request, set it high enough — 2000 or more is a safe start — or the reply can come back empty with finish_reason "length". */
             max_tokens?: number;
             /** @description Sampling temperature (0–2). */
             temperature?: number;
@@ -313,7 +403,7 @@ export interface components {
              * @description If true, returns an SSE stream of partial completions.
              * @default false
              */
-            stream: boolean;
+            stream?: boolean;
             /** @description Stop sequence(s) to end generation. */
             stop?: string | string[];
             /** @description Penalizes repeated tokens based on frequency. */
@@ -328,10 +418,41 @@ export interface components {
             tool_choice?: string | {
                 [key: string]: unknown;
             };
-            /** @description Response format constraint (e.g., `{"type":"json_object"}`). */
+            /** @description How much the model reasons before answering, on models that reason on request (for example low, medium, high). Reasoning tokens are billed as output tokens. */
+            reasoning_effort?: string;
+            /** @description `{"enabled": true}` asks for reasoning. On models that take `reasoning_effort`, it is applied as `reasoning_effort: "medium"`; when `reasoning_effort` is also sent, `reasoning_effort` applies. `{"enabled": false}` does not turn reasoning off on those models. */
+            reasoning?: {
+                enabled?: boolean;
+            };
+            /** @description Response format constraint (e.g., `{"type":"json_object"}`). The JSON reply is returned in `message.content`. With a `json_schema` and `strict: true`, a reply that does not match the schema returns HTTP 400 `structured_output_mismatch` and is not billed; without `strict: true`, the reply is returned even when it does not match the schema. */
             response_format?: {
                 [key: string]: unknown;
             };
+            /**
+             * @description Request Priority or Flex processing on supported models. Omit for the standard tier. On models without the requested tier, the request is processed on the standard tier. See https://docs.devupai.com/docs/service-tiers
+             * @enum {string}
+             */
+            service_tier?: "priority" | "flex";
+            /** @description Maximum tokens to generate in the response, with the same rules as `max_tokens`: the largest accepted value is the model's own `max_output_tokens` in `GET /v1/models`, and a larger value returns HTTP 400 `invalid_max_tokens`. Send either `max_tokens` or `max_completion_tokens`; when both are sent, `max_completion_tokens` can take precedence. */
+            max_completion_tokens?: number;
+            /**
+             * @description How many choices to generate. A whole number of at least 1 (absent or null means 1); any other value returns HTTP 400 `invalid_value`. A request needs enough balance for the output of every choice.
+             * @default 1
+             */
+            n?: number | null;
+            /** @description Options for a streaming request (`stream: true`). */
+            stream_options?: {
+                /** @description Streams end with a chunk that carries `usage`. */
+                include_usage?: boolean;
+            };
+            /** @description Whether the model may return several tool calls in one reply. Used with `tools`; a model's `tool_calls.parallel` in `GET /v1/models` says whether it can. */
+            parallel_tool_calls?: boolean;
+            /** @description Asks the model for repeatable sampling: the same `seed` with the same parameters tends to return the same reply. How repeatable a reply is depends on the model. */
+            seed?: number;
+            /** @description A stable identifier for your end user; send a hash rather than personal data. */
+            user?: string;
+            /** @description Asks for the log probabilities of the output tokens, returned in `choices[].logprobs` by models that provide them. */
+            logprobs?: boolean;
         };
         ChatMessage: {
             /**
@@ -340,13 +461,17 @@ export interface components {
              */
             role: "system" | "user" | "assistant" | "tool";
             /**
-             * @description The message content (text or multimodal content parts).
+             * @description The message content (text or multimodal content parts; see `ChatContentPart`).
              *     Assistant tool-call messages may contain content: null.
+             *     On /v1/chat/completions, a user message can carry `image_url` parts
+             *     (an `https://` URL or a `data:` URL) for models whose `supports.vision`
+             *     is true, and `file` parts for models whose `supports.pdf_input` is true:
+             *     `{"type": "file", "file": {"filename": "document.pdf", "file_data": "data:application/pdf;base64,..."}}`.
+             *     A part the model does not accept, or a `file` part that is not an inline
+             *     PDF, returns HTTP 400 `unsupported_content`.
              */
-            content: string | {
-                [key: string]: unknown;
-            }[] | null;
-            /** @description The model's reasoning trace when the model produces one; null otherwise. Populated by some reasoning models only — a consumer must not assume it carries content. */
+            content: string | components["schemas"]["ChatContentPart"][] | null;
+            /** @description The model's reasoning trace when the model produces one; null otherwise. Populated by some reasoning models only — a consumer must not assume it carries content. Reasoning that a model writes inside `content` between <think> or <thinking> tags is moved here, with or without streaming. */
             reasoning_content?: string | null;
             /** @description Optional name for the participant. */
             name?: string;
@@ -358,7 +483,7 @@ export interface components {
             tool_call_id?: string;
         };
         ChatCompletionResponse: {
-            /** @description Unique response identifier. */
+            /** @description Chat completion id: `chatcmpl-` followed by a UUID. Streamed chunks of the same completion carry the same id. */
             id: string;
             /** @enum {string} */
             object: "chat.completion";
@@ -366,31 +491,386 @@ export interface components {
             created: number;
             /** @description The model used. */
             model: string;
+            /** @description The tier that processed the request (`priority`, `flex`, or `default`). Requests are billed at Priority or Flex prices only when this reports that tier. */
+            service_tier?: string | null;
             choices: {
                 index?: number;
                 message?: components["schemas"]["ChatMessage"];
+                /** @description Log probabilities of the output tokens, when the request set `logprobs` and the model provides them. */
+                logprobs?: {
+                    [key: string]: unknown;
+                } | null;
                 /** @enum {string} */
                 finish_reason?: "stop" | "length" | "tool_calls" | "content_filter";
             }[];
+            /** @description Opaque value present on some replies. It does not identify a configuration; do not compare it between replies. */
+            system_fingerprint?: string;
             usage?: components["schemas"]["TokenUsage"];
-            _devup: components["schemas"]["DevUpBilling"];
+            /** @description Billing metadata and notices for this response. Present when the response has billing metadata or at least one notice; check for it before reading it. */
+            _devup?: components["schemas"]["DevUpBilling"];
         };
         TokenUsage: {
             /** @description Tokens in the prompt. */
             prompt_tokens?: number;
-            /** @description Tokens in the generated completion. */
+            /** @description Tokens in the generated completion, reasoning tokens included. */
             completion_tokens?: number;
             /** @description Total tokens used. */
             total_tokens?: number;
-            /** @description Tokens consumed by the model's reasoning trace. Returned by some providers only (measured on 1 of 5 providers). Consumers must check for its presence rather than assume it. */
-            reasoning_tokens?: number;
-            /** @description Breakdown of prompt token consumption. Nullable because some providers omit this object entirely. */
+            /** @description Breakdown of prompt token consumption. May be null or omitted. */
             prompt_tokens_details?: {
                 /** @description Number of prompt tokens served from cache. */
                 cached_tokens?: number;
-                /** @description Number of prompt tokens written to cache. May be null. */
-                cache_write_tokens?: number | null;
             } | null;
+            /** @description Breakdown of completion token consumption. May be null or omitted. */
+            completion_tokens_details?: {
+                /** @description Tokens consumed by the model's reasoning trace, counted in `completion_tokens`. Returned by some models only; check for its presence rather than assume it. */
+                reasoning_tokens?: number;
+            } | null;
+        };
+        /** @description One part of a chat message's `content` array. The typed parts are `text`, `image_url` and `file`. A model whose `supports.audio_input` or `supports.video_input` is true also accepts audio or video parts, which are objects with their own `type`. */
+        ChatContentPart: components["schemas"]["ChatContentPartText"] | components["schemas"]["ChatContentPartImageUrl"] | components["schemas"]["ChatContentPartFile"] | ({
+            type: string;
+        } & {
+            [key: string]: unknown;
+        });
+        ChatContentPartText: {
+            /** @enum {string} */
+            type: "text";
+            /** @description The text of this part. */
+            text: string;
+        };
+        /**
+         * @description An image, for models whose `supports.vision` is true. An image part sent to a model whose `supports.vision` is false returns HTTP 400 `unsupported_content` and is not charged.
+         * @example {
+         *       "type": "image_url",
+         *       "image_url": {
+         *         "url": "https://example.com/photo.jpg"
+         *       }
+         *     }
+         */
+        ChatContentPartImageUrl: {
+            /** @enum {string} */
+            type: "image_url";
+            image_url: {
+                /** @description An `https://` URL of the image, or a `data:` URL with the Base64-encoded image. */
+                url: string;
+            };
+        };
+        /**
+         * @description A PDF document, for models whose `supports.pdf_input` is true. Only inline PDF data is accepted. A `file` part sent to a model whose `supports.pdf_input` is false, or a `file` part that is not an inline PDF (a `file_id`, another media type, or data that is not a PDF), returns HTTP 400 `unsupported_content` and is not charged.
+         * @example {
+         *       "type": "file",
+         *       "file": {
+         *         "filename": "document.pdf",
+         *         "file_data": "data:application/pdf;base64,..."
+         *       }
+         *     }
+         */
+        ChatContentPartFile: {
+            /** @enum {string} */
+            type: "file";
+            file: {
+                /** @description The file name, for example `document.pdf`. */
+                filename?: string;
+                /** @description The PDF as a `data:application/pdf;base64,` URL. The decoded data starts with the PDF signature `%PDF-`. */
+                file_data: string;
+            };
+        };
+        /**
+         * @description One event of a chat completion stream (`stream: true`), sent as a Server-Sent Events `data:` line. Every chunk of a stream carries the same `id`. When the model completes its reply, the last chunk has an empty `choices` array and carries `usage`; no other chunk carries `usage`. The `data: [DONE]` terminal event may not be present in every stream.
+         * @example {
+         *       "id": "chatcmpl-79037612-d7c2-43e0-8494-c560f97c61ea",
+         *       "object": "chat.completion.chunk",
+         *       "created": 1700000000,
+         *       "model": "deepseek-ai/DeepSeek-V4-Pro",
+         *       "choices": [
+         *         {
+         *           "index": 0,
+         *           "delta": {
+         *             "content": "Hello"
+         *           },
+         *           "finish_reason": null
+         *         }
+         *       ]
+         *     }
+         */
+        ChatCompletionChunk: {
+            /** @description Chat completion id: `chatcmpl-` followed by a UUID, the same on every chunk of the stream. */
+            id: string;
+            /** @enum {string} */
+            object: "chat.completion.chunk";
+            /** @description Unix timestamp of the response. */
+            created: number;
+            /** @description The model used. */
+            model: string;
+            /** @description The new output of each choice. Empty on the last chunk, which carries `usage`. */
+            choices: {
+                index: number;
+                /** @description The part of the message added by this chunk. */
+                delta: {
+                    /** @description The role of the message author (`assistant`). Not present on every chunk. */
+                    role?: string;
+                    /** @description Text added to the reply. */
+                    content?: string | null;
+                    /** @description Reasoning trace added by this chunk, on models that produce one. Reasoning that a model writes inside `content` between <think> or <thinking> tags is moved here. */
+                    reasoning_content?: string | null;
+                    /** @description Parts of tool calls, joined by `index` across chunks. */
+                    tool_calls?: {
+                        index: number;
+                        id?: string;
+                        /** @enum {string} */
+                        type?: "function";
+                        function?: {
+                            name?: string;
+                            /** @description Part of the JSON arguments of the call. */
+                            arguments?: string;
+                        };
+                    }[];
+                };
+                /** @description Log probabilities of the tokens in this chunk, when the request set `logprobs` and the model provides them. */
+                logprobs?: {
+                    [key: string]: unknown;
+                } | null;
+                /**
+                 * @description Null until the choice ends.
+                 * @enum {string|null}
+                 */
+                finish_reason?: "stop" | "length" | "tool_calls" | "content_filter" | null;
+            }[];
+            usage?: components["schemas"]["TokenUsage"];
+            /** @description The tier that processed the request (`priority`, `flex`, or `default`). The first chunk may carry null. */
+            service_tier?: string | null;
+            /** @description Opaque value present on some streams, the same on every chunk of a stream. It does not identify a configuration; do not compare it between streams. */
+            system_fingerprint?: string;
+            /** @description Present only when returned by the API. */
+            _devup?: components["schemas"]["DevUpBilling"];
+        };
+        /**
+         * @description The event a chat completion stream sends when an error occurs after the stream has started (the HTTP 200 is already sent): one `data:` line with the same `error` object as an HTTP error response, followed by `data: [DONE]`. No other event follows. An error before the first event is answered with its HTTP status instead of a stream. The codes you can act on are listed at https://docs.devupai.com/docs/errors. In the example, `request_failed` is an example value of `error.code`.
+         * @example {
+         *       "error": {
+         *         "message": "The request could not be completed. Retry later or contact support.",
+         *         "type": "devup_error",
+         *         "code": "request_failed"
+         *       }
+         *     }
+         */
+        ChatCompletionStreamError: components["schemas"]["ErrorResponse"];
+        /** @description The request body of `POST /v1/responses`. A key that is not accepted returns HTTP 400 `unsupported_parameter`; for example, send `reasoning.effort` instead of `reasoning_effort`. */
+        ResponsesRequest: {
+            /** @description Model id of any text model in the catalog (e.g., `openai/gpt-5.6-luna`, `deepseek-ai/DeepSeek-V4-Pro`). */
+            model: string;
+            /** @description The input prompt or items for the model. When the last message in the conversation is from the assistant, the model answers with a new assistant message. */
+            input?: string | {
+                [key: string]: unknown;
+            }[];
+            /** @description System or developer instructions directing the model's behavior. */
+            instructions?: string;
+            /** @description Maximum number of output tokens to generate: a whole number from 1 to the model's own `max_output_tokens` in `GET /v1/models`. A larger value, or one that is not a whole number, returns HTTP 400 `invalid_max_tokens`. When omitted, the reply is limited to the model's default output length, which is at most its `max_output_tokens`. */
+            max_output_tokens?: number;
+            /** @description Reasoning configuration object. */
+            reasoning?: {
+                /**
+                 * @description Desired effort level for model reasoning.
+                 * @enum {string}
+                 */
+                effort?: "none" | "low" | "medium" | "high" | "xhigh";
+            } & {
+                [key: string]: unknown;
+            };
+            /** @description Sampling temperature. */
+            temperature?: number;
+            /** @description Nucleus sampling probability. */
+            top_p?: number;
+            /** @description Presence penalty parameter. */
+            presence_penalty?: number;
+            /** @description Frequency penalty parameter. */
+            frequency_penalty?: number;
+            /** @description A unique identifier representing your end-user. */
+            user?: string;
+            /** @description Text configuration or content. */
+            text?: string | {
+                [key: string]: unknown;
+            };
+            /** @description Developer-assigned metadata for the response. */
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /** @description Tools the model may call. Supported tool types: `function`, `custom` (a tool that takes free-form text input) and `namespace` (a named group of `function` and `custom` tools). A call to a function declared in a `namespace` tool is returned with a separate `namespace` field. Some models do not take `custom` tools: a request with one returns HTTP 400 `unsupported_parameter` with the message "Tool type 'custom' is not available for this model. Remove it from the request." Any other tool type returns HTTP 400 `unsupported_parameter`. */
+            tools?: ({
+                /**
+                 * @description `function`, `custom` or `namespace`.
+                 * @enum {string}
+                 */
+                type: "function" | "custom" | "namespace";
+            } & {
+                [key: string]: unknown;
+            })[];
+            /** @description `auto`, `none`, `required`, or `{ "type": "function", "name": "..." }` to require one function. */
+            tool_choice?: ("auto" | "none" | "required") | {
+                /** @enum {string} */
+                type: "function";
+                name: string;
+            };
+            /** @description Whether the model may call several tools in one turn. */
+            parallel_tool_calls?: boolean;
+            /** @description Accepted for compatibility. Requests on this endpoint are processed on the standard tier, and the response carries no `service_tier`. */
+            service_tier?: string;
+            /** @description Truncation strategy for the conversation. */
+            truncation?: string | {
+                [key: string]: unknown;
+            };
+            /**
+             * @description `store` is always treated as `false`.
+             * @default false
+             */
+            store?: boolean;
+            /**
+             * @description Set to `true` to receive the response as Server-Sent Events.
+             * @default false
+             */
+            stream?: boolean;
+            /** @description Additional output data to include in the response, as in the OpenAI Responses API (for example `reasoning.encrypted_content`). Applied when the model supports it; otherwise the response is generated without it. */
+            include?: string[];
+            /** @description A stable identifier for your end user, as in the OpenAI Responses API; send a hash rather than personal data. Applied when the model supports it; otherwise the response is generated without it. */
+            safety_identifier?: string;
+            /** @description The number of most likely tokens to return at each output position, with their log probabilities, as in the OpenAI Responses API. Applied when the model supports it; otherwise the response is generated without it. */
+            top_logprobs?: number;
+            /** @description The maximum number of tool calls in one response, as in the OpenAI Responses API. Applied when the model supports it; otherwise the response is generated without it. */
+            max_tool_calls?: number;
+            /** @description Accepted for compatibility with OpenAI clients; it does not change the stream. Stream events carry no `obfuscation` field. */
+            stream_options?: {
+                [key: string]: unknown;
+            };
+            /** @description Accepted only when empty, blank or `null`. Responses are not stored, so a conversation cannot continue from an earlier response: send the full conversation in `input` on every turn. A non-empty value returns HTTP 400 `unsupported_parameter`. */
+            previous_response_id?: string | null;
+            /** @description Accepted for compatibility with clients that send it; it does not change the response. */
+            client_metadata?: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description Accepted as `false` or `null`: the response is always generated while the request is open. `true` returns HTTP 400 `unsupported_parameter`.
+             * @enum {boolean|null}
+             */
+            background?: false | null;
+        };
+        /** @description OpenAI-compatible Responses API payload. */
+        ResponsesResponse: {
+            /** @description Unique identifier for the response. */
+            id?: string;
+            /** @example response */
+            object?: string;
+            /** @description Unix timestamp when the response was created. */
+            created_at?: number;
+            /** @description The requested model identifier. */
+            model?: string;
+            /** @description Generation status (e.g., `completed`). */
+            status?: string;
+            /** @description Output items generated by the model. A `function_call` item for a function declared in a `namespace` tool carries a `namespace` field. */
+            output?: {
+                [key: string]: unknown;
+            }[];
+            /** @description Set when the response could not be completed (the response carried by a `response.failed` stream event); `null` otherwise. */
+            error?: ({
+                message?: string;
+                /** @example devup_error */
+                type?: string;
+                /** @description Machine-readable error code. */
+                code?: string;
+            } & {
+                [key: string]: unknown;
+            }) | null;
+            /** @description Why the output ended before the model finished, when `status` is `incomplete`; `null` otherwise. */
+            incomplete_details?: ({
+                /** @description For example `max_output_tokens` or `content_filter`. */
+                reason?: string;
+            } & {
+                [key: string]: unknown;
+            }) | null;
+            /** @description Token usage of the response. `null` in the response objects that stream events carry before the final event. */
+            usage?: ({
+                input_tokens?: number;
+                output_tokens?: number;
+                total_tokens?: number;
+                input_tokens_details?: {
+                    /** @description Number of prompt tokens served from cache. */
+                    cached_tokens?: number;
+                };
+                output_tokens_details?: {
+                    reasoning_tokens?: number;
+                };
+            } & {
+                [key: string]: unknown;
+            }) | null;
+            _devup?: components["schemas"]["DevUpBilling"];
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * @description The event types a `POST /v1/responses` stream sends. Other event types of the OpenAI-compatible Responses API can also appear; skip any type your client does not handle.
+         * @enum {string}
+         */
+        ResponsesStreamEventType: "response.created" | "response.in_progress" | "response.output_item.added" | "response.output_item.done" | "response.content_part.added" | "response.content_part.done" | "response.output_text.delta" | "response.output_text.done" | "response.reasoning_summary_part.added" | "response.reasoning_summary_part.done" | "response.reasoning_summary_text.delta" | "response.reasoning_summary_text.done" | "response.function_call_arguments.delta" | "response.function_call_arguments.done" | "response.completed" | "response.incomplete" | "response.failed" | "error";
+        /** @description One event of a `POST /v1/responses` stream (`stream: true`): the JSON on the `data:` line of a Server-Sent Event whose `event:` line repeats `type`. Event types: `response.created`, `response.in_progress`, `response.output_item.added`, `response.output_item.done`, `response.content_part.added`, `response.content_part.done`, `response.output_text.delta`, `response.output_text.done`, `response.reasoning_summary_part.added`, `response.reasoning_summary_part.done`, `response.reasoning_summary_text.delta`, `response.reasoning_summary_text.done`, `response.function_call_arguments.delta`, `response.function_call_arguments.done`, and the final events `response.completed`, `response.incomplete` and `response.failed`. One `error` event (`ResponsesStreamErrorEvent`) follows `response.failed`; nothing is sent after it. Other event types of the OpenAI-compatible Responses API can also appear, for example for `custom` tools; skip any type your client does not handle. `response.created`, `response.in_progress` and the final events carry the full `response` object; the other events carry `output_index` and the fields of their type. */
+        ResponsesStreamEvent: {
+            /** @description The event type, for example `response.output_text.delta`. The known values are listed in `ResponsesStreamEventType`. */
+            type: string;
+            /** @description The position of the event in the stream. */
+            sequence_number: number;
+            response?: components["schemas"]["ResponsesResponse"];
+            /** @description The index of the output item the event belongs to. */
+            output_index?: number;
+            /** @description The id of the output item the event belongs to. */
+            item_id?: string;
+            /** @description The output item, on `response.output_item.added` and `response.output_item.done`. */
+            item?: {
+                [key: string]: unknown;
+            };
+            content_index?: number;
+            summary_index?: number;
+            /** @description The content or summary part, on the `*_part.added` and `*_part.done` events. */
+            part?: {
+                [key: string]: unknown;
+            };
+            /** @description The text added, on `*.delta` events. */
+            delta?: string;
+            /** @description The full text, on `response.output_text.done` and `response.reasoning_summary_text.done`. */
+            text?: string;
+            /** @description The full function call arguments, on `response.function_call_arguments.done`. */
+            arguments?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * @description The last event of a `POST /v1/responses` stream whose response could not be completed. It follows the `response.failed` event, and nothing is sent after it. The HTTP status of the stream stays 200, so read the error from this event. In the example, `request_failed` is an example value of `code`.
+         * @example {
+         *       "type": "error",
+         *       "sequence_number": 11,
+         *       "code": "request_failed",
+         *       "message": "The request could not be completed. Retry later or contact support.",
+         *       "param": null,
+         *       "error": {
+         *         "message": "The request could not be completed. Retry later or contact support.",
+         *         "type": "devup_error",
+         *         "code": "request_failed"
+         *       }
+         *     }
+         */
+        ResponsesStreamErrorEvent: {
+            /** @enum {string} */
+            type: "error";
+            sequence_number: number;
+            /** @description An error code. The same value as `error.code`. */
+            code: string;
+            /** @description What happened and what to do next. The same value as `error.message`. */
+            message: string;
+            param?: null;
+            error: {
+                message: string;
+                /** @enum {string} */
+                type: "devup_error";
+                code: string;
+            };
         };
         EmbeddingRequest: {
             /** @description Embedding model identifier. */
@@ -398,12 +878,13 @@ export interface components {
             /** @description Text or array of texts to embed. */
             input: string | string[];
             /**
-             * @description Format of the embedding vectors.
+             * @description Format of the embedding vectors: `float` returns each vector as an array of numbers, `base64` returns it as a base64-encoded string.
              * @default float
              * @enum {string}
              */
-            encoding_format: "float" | "base64";
+            encoding_format?: "float" | "base64";
         };
+        /** @description `_devup` carries the billing metadata of the request. It can be absent from a response; the request ID is always in the `x-request-id` response header. */
         EmbeddingResponse: {
             /** @enum {string} */
             object: "list";
@@ -411,15 +892,15 @@ export interface components {
                 /** @enum {string} */
                 object?: "embedding";
                 index?: number;
-                /** @description The embedding vector. */
-                embedding?: number[];
+                /** @description The embedding vector: an array of numbers, or a base64-encoded string when the request sets `encoding_format` to `base64`. */
+                embedding?: number[] | string;
             }[];
             model: string;
             usage?: {
                 prompt_tokens?: number;
                 total_tokens?: number;
             };
-            _devup: components["schemas"]["DevUpBilling"];
+            _devup?: components["schemas"]["DevUpBilling"];
         };
         RerankRequest: {
             /** @description Reranker model identifier. */
@@ -434,7 +915,7 @@ export interface components {
              * @description Whether to include the original document text in the response.
              * @default false
              */
-            return_documents: boolean;
+            return_documents?: boolean;
         };
         RerankResponse: {
             /** @enum {string} */
@@ -452,33 +933,39 @@ export interface components {
         };
         /**
          * @description Request schema for image editing via `multipart/form-data`.
-         *     Unknown multipart fields may be forwarded transparently to the upstream provider depending on the specific model endpoint requirements.
+         *     Additional multipart fields may be accepted, depending on the model.
          */
         ImageEditRequest: {
             /** @description Image generation model identifier. */
             model: string;
-            /** @description Text description of the desired image edits. Forwarded transparently. */
+            /** @description Text description of the desired image edits. */
             prompt?: string;
             /**
              * Format: binary
-             * @description Base image to edit. Forwarded transparently.
+             * @description Base image to edit.
              */
             image?: string;
             /**
              * Format: binary
-             * @description Optional mask for inpainting. Forwarded transparently.
+             * @description Optional mask for inpainting.
              */
             mask?: string;
             /**
-             * @description Image dimensions (e.g., `1024x1024`, `512x512`). Forwarded transparently.
+             * @description Image dimensions (e.g., `1024x1024`, `512x512`).
              * @default 1024x1024
              */
-            size: string;
+            size?: string;
             /**
              * @description Number of images to generate.
              * @default 1
              */
-            n: number;
+            n?: number;
+            /**
+             * @description How the images are returned: `url` returns a temporary link in `data[].url`; `b64_json` returns the image bytes base64-encoded in `data[].b64_json`, and no file is stored. Any other value returns HTTP 400 `invalid_response_format`.
+             * @default url
+             * @enum {string}
+             */
+            response_format?: "url" | "b64_json";
         };
         ImageGenerationRequest: {
             /** @description Image generation model identifier. */
@@ -491,12 +978,12 @@ export interface components {
              * @description Image dimensions (e.g., `1024x1024`, `512x512`).
              * @default 1024x1024
              */
-            size: string;
+            size?: string;
             /**
              * @description Number of images to generate.
              * @default 1
              */
-            n: number;
+            n?: number;
             /** @description Image width in pixels (alternative to `size`). */
             width?: number;
             /** @description Image height in pixels (alternative to `size`). */
@@ -507,15 +994,23 @@ export interface components {
             guidance_scale?: number;
             /** @description Random seed for reproducibility. */
             seed?: number;
+            /**
+             * @description How the images are returned: `url` returns a temporary link in `data[].url`; `b64_json` returns the image bytes base64-encoded in `data[].b64_json`, and no file is stored. Any other value returns HTTP 400 `invalid_response_format`.
+             * @default url
+             * @enum {string}
+             */
+            response_format?: "url" | "b64_json";
         };
         ImageGenerationResponse: {
-            data: {
+            data: ({
                 /**
                  * Format: uri
                  * @description URL of the generated image.
                  */
                 url?: string;
-            }[];
+                /** @description The image bytes, base64-encoded. */
+                b64_json?: string;
+            } & (unknown | unknown))[];
             _devup: components["schemas"]["DevUpBilling"];
         };
         SpeechRequest: {
@@ -527,19 +1022,20 @@ export interface components {
              * @description Voice preset to use.
              * @default aura-asteria-en
              */
-            voice: string;
+            voice?: string;
             /**
              * @description Audio output format.
              * @default mp3
              * @enum {string}
              */
-            response_format: "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm";
+            response_format?: "mp3" | "opus" | "aac" | "flac" | "wav" | "pcm";
             /**
              * Format: uri
              * @description Public HTTPS URL to a reference audio file for voice cloning.
-             *     Required only when the selected model uses voice-cloning mode (AUDIO_REFERENCE).
-             *     Validated against SSRF rules before any fetch — must be a publicly reachable HTTPS URL.
-             *     Ignored by models that do not support AUDIO_REFERENCE.
+             *     Required by models that clone a voice from a reference recording; without it they
+             *     return HTTP 400 `reference_audio_required`. Must be a publicly reachable HTTPS URL;
+             *     any other URL returns HTTP 400 `invalid_reference_audio_url`, for every model.
+             *     Other models do not use the reference audio.
              */
             referenceAudioUrl?: string;
         };
@@ -561,32 +1057,48 @@ export interface components {
              * @description Speech recognition model identifier.
              * @default openai/whisper-large-v3-turbo
              */
-            model: string;
+            model?: string;
             /** @description ISO-639-1 language code to hint the recognizer. */
             language?: string;
             /**
-             * @description Format of the transcription response. The route always requests `verbose_json`
-             *     from the upstream provider internally (for accurate billing and segment data),
-             *     then converts to the client-requested format before returning.
-             *     Unknown values default to `json`. `text`, `srt`, and `vtt` are returned as
+             * @description Format of the transcription response. `json` returns the text; `verbose_json`
+             *     also returns the duration, the segments and, when the model returns them, the
+             *     language, the task and word timestamps. `text`, `srt`, and `vtt` are returned as
              *     `text/plain`; `json` and `verbose_json` are returned as `application/json`.
+             *     Any other value returns the `json` response.
              * @default json
              * @enum {string}
              */
-            response_format: "json" | "verbose_json" | "text" | "srt" | "vtt";
+            response_format?: "json" | "verbose_json" | "text" | "srt" | "vtt";
         };
         TranscriptionResponse: {
             /** @description The transcribed text. */
             text: string;
+            _devup: components["schemas"]["DevUpBilling"];
         };
         TranscriptionVerboseResponse: {
+            /** @description The task performed, for example `transcribe`. Present when the model returns it. */
+            task?: string;
+            /** @description The language of the audio. Present when the model returns it. */
+            language?: string;
             /** @description The transcribed text. */
             text: string;
             /** @description Total audio duration in seconds. */
-            duration: number;
-            segments: {
+            duration?: number;
+            segments?: {
                 [key: string]: unknown;
             }[];
+            /** @description Word-level timestamps. Present when the model returns them. */
+            words?: ({
+                word?: string;
+                /** @description Start of the word, in seconds. */
+                start?: number;
+                /** @description End of the word, in seconds. */
+                end?: number;
+            } & {
+                [key: string]: unknown;
+            })[];
+            _devup: components["schemas"]["DevUpBilling"];
         };
         VideoGenerationRequest: {
             /** @description Video generation model identifier. */
@@ -603,6 +1115,12 @@ export interface components {
             height?: number;
             /** @description Random seed for reproducibility. */
             seed?: number;
+            /**
+             * @description How the video is returned: `url` returns a temporary link in `data[0].url`; `b64_json` returns the video bytes base64-encoded in `data[0].b64_json`. A video larger than the inline size limit is returned in `data[0].url`, and `_devup.note` says so. Any other value returns HTTP 400 `invalid_response_format`.
+             * @default url
+             * @enum {string}
+             */
+            response_format?: "url" | "b64_json";
         };
         VideoEditRequest: {
             /** @description Video editing model identifier. */
@@ -628,46 +1146,54 @@ export interface components {
              * @description JSON-encoded string representing an array of key-point objects for key_points mode.
              *     Each object must have numeric `x`, `y` coordinates and a `type` of either `"positive"` or `"negative"`.
              *     Example: `"[{\"x\":100,\"y\":200,\"type\":\"positive\"}]"`
-             *     The route calls JSON.parse() on this field before forwarding.
+             *     Must be a JSON string.
              */
             key_points?: string;
             /**
              * @description Frame index for key_points editing mode.
              * @default 0
              */
-            frame_index: number;
+            frame_index?: number;
             /**
              * @description Whether to auto-trim the output video.
              * @default false
              */
-            auto_trim: boolean;
+            auto_trim?: boolean;
             /**
              * @description Whether to preserve the original audio track in the output.
              * @default true
              */
-            preserve_audio: boolean;
+            preserve_audio?: boolean;
             /**
              * @description Background fill color (background_color mode). CSS color name or hex value.
              * @default White
              */
-            background_color: string;
+            background_color?: string;
             /**
              * @description Upscale factor for upscale_factor mode. Only 2 or 4 are accepted; other values are coerced to 2.
              * @default 2
              * @enum {integer}
              */
-            desired_increase: 2 | 4;
-            /** @description Output container and codec string forwarded to the upstream provider. */
+            desired_increase?: 2 | 4;
+            /** @description Output container and codec string. */
             output_container_and_codec?: string;
+            /**
+             * @description How the video is returned: `url` returns a temporary link in `data[0].url`; `b64_json` returns the video bytes base64-encoded in `data[0].b64_json`. A video larger than the inline size limit is returned in `data[0].url`, and `_devup.note` says so. Any other value returns HTTP 400 `invalid_response_format`.
+             * @default url
+             * @enum {string}
+             */
+            response_format?: "url" | "b64_json";
         };
         VideoGenerationResponse: {
-            data: {
+            data: ({
                 /**
                  * Format: uri
                  * @description URL of the generated or edited video.
                  */
-                url: string;
-            }[];
+                url?: string;
+                /** @description The video bytes, base64-encoded. */
+                b64_json?: string;
+            } & (unknown | unknown))[];
             _devup: components["schemas"]["DevUpBilling"];
         };
         ModelListResponse: {
@@ -676,14 +1202,115 @@ export interface components {
             data: components["schemas"]["ModelObject"][];
         };
         ModelObject: {
-            /** @description Model identifier (slug or provider model ID). */
+            /** @description Model identifier (its slug or its full ID). */
             id: string;
             /** @enum {string} */
             object: "model";
-            /** @description Unix timestamp of model creation. */
+            /** @description The model's display name. */
+            name: string;
+            /** @description Unix timestamp (in seconds) when the model was added to the catalog. */
             created: number;
-            /** @enum {string} */
-            owned_by: "devupai";
+            /** @description The model's creator or organization, taken from `id`: the part before its first `/`, or the whole `id` when it contains no `/`. */
+            owned_by: string;
+            /** @description The model's type. Current values: `text-generation`, `embeddings`, `reranker`, `text-to-image`, `text-to-video`, `text-to-speech`, `automatic-speech-recognition`, `zero-shot-image-classification`, `multimodal` and `OCR`. New values can be added. */
+            type: string;
+            /** @description The maximum context size (input + output tokens) for this model. An integer, or null when not set. */
+            context_window: number | null;
+            /** @description A short display label for the context size. */
+            context_length?: string;
+            /**
+             * @description The model's own output limit, which differs from model to model: the largest value the model accepts for `max_tokens` and `max_completion_tokens` on `POST /v1/chat/completions`, for `max_output_tokens` on `POST /v1/responses`, and for `max_tokens` on `POST /anthropic/v1/messages`. A larger value returns HTTP 400 `invalid_max_tokens` (on `POST /anthropic/v1/messages`, the same message in an `invalid_request_error`). A request that sends none of these parameters is limited to the model's default output length, which is at most this value. Listed for models that generate text (`type` `text-generation`).
+             * @example 8192
+             */
+            max_output_tokens?: number;
+            /** @description Whether the model has been superseded by a newer version. */
+            is_replaced: boolean;
+            pricing: components["schemas"]["ModelPricing"];
+            /** @description Supported modality or capability flags (e.g. multimodal, OCR). */
+            capabilities?: string[];
+            /** @description Feature support flags, present on every model. `supports.reasoning: true` with no `reasoning` object means the model's reasoning mode is not known yet. */
+            supports: {
+                /** @description The model takes `tools` and can return tool calls. */
+                tools: boolean;
+                /** @description The model accepts images in messages. */
+                vision: boolean;
+                /** @description The model reasons, always or when asked. */
+                reasoning: boolean;
+                /** @description A `response_format` of type `json_schema` returns JSON that matches the schema. */
+                structured_output: boolean;
+                /** @description The model accepts audio in messages. */
+                audio_input: boolean;
+                /** @description The model accepts video in messages. */
+                video_input: boolean;
+                /** @description The model can answer without reasoning. */
+                reasoning_can_be_disabled: boolean;
+                /** @description The model accepts PDF file input in chat messages, as `file` content parts whose `file_data` is a `data:application/pdf;base64,` URL. */
+                pdf_input: boolean;
+            };
+            /**
+             * @description Tool calling details for the model. Each key is present only when known; the object is omitted when no key is known.
+             * @example {
+             *       "chat_completions": false
+             *     }
+             */
+            tool_calls?: {
+                /** @description `false`: tool calls for this model are served on `/v1/responses`, and a `POST /v1/chat/completions` request with `tools` returns HTTP 400 `use_responses_api`. `true`: tool calls are served on `/v1/chat/completions`. */
+                chat_completions?: boolean;
+                /** @description `true`: the model can return several tool calls in one reply. `false`: it returns at most one tool call per reply. */
+                parallel?: boolean;
+            };
+            /**
+             * @description For each `tool_choice` value whose handling is known: `true` when the model enforces it, `false` when the model selects tools on its own. `function` is a named function. `auto` is not listed: the model always decides. A value that is not listed is not known yet. Omitted when no value is known.
+             * @example {
+             *       "required": false,
+             *       "function": false
+             *     }
+             */
+            tool_choice?: {
+                none?: boolean;
+                required?: boolean;
+                function?: boolean;
+            };
+            /**
+             * @description The model's reasoning mode and, when known, the request parameter that controls it with the reasoning levels you can send to the model. Omitted while the mode is not known: `supports.reasoning: true` with no `reasoning` object means the mode is not known yet.
+             * @example {
+             *       "mode": "on_request",
+             *       "parameter": "reasoning_effort",
+             *       "values": [
+             *         "low",
+             *         "medium",
+             *         "high"
+             *       ]
+             *     }
+             */
+            reasoning?: {
+                /**
+                 * @description `always`: the model reasons without being asked. `on_request`: it reasons when asked. `none`: no configurable reasoning mode.
+                 * @enum {string}
+                 */
+                mode: "always" | "on_request" | "none";
+                /** @description The request parameter that turns reasoning on or sets its level, when known (for example `reasoning_effort`). It can appear with mode `always`, where it sets the level, and with mode `on_request`. */
+                parameter?: string;
+                /** @description The reasoning levels you can send to this model with `parameter`, from least to most reasoning. `none`, when listed, turns reasoning off. How much each level changes the reasoning depends on the model. Some models list a single value, which turns reasoning on. For `reasoning_effort`, the values come from `none`, `minimal`, `low`, `medium`, `high`, `xhigh` and `max`, in that order. */
+                values?: (string | number | boolean)[];
+            };
+        };
+        ModelPricing: {
+            /** @description Pricing unit (e.g. 1M Tokens, Image, Second, Dynamic Image). */
+            unit: string;
+            /**
+             * @description Currency code.
+             * @enum {string}
+             */
+            currency: "DZD";
+            /** @description Cost per unit for input tokens, image, second, or base multiplier. */
+            input: number;
+            /** @description Cost per unit for output tokens (if applicable). */
+            output?: number;
+            /** @description Dynamic sizing formula for dynamic image generation (if applicable). */
+            formula?: string;
+            /** @description Cost per unit for cached input tokens. */
+            cached?: number;
         };
         BalanceResponse: {
             /**
@@ -691,6 +1318,45 @@ export interface components {
              * @description Current account balance in Algerian Dinar (DZD).
              */
             balance_dzd: number;
+        };
+        /** @description The profile of the account that owns the API key. Exactly these five fields are returned; the full email address is never returned. */
+        AccountProfile: {
+            /**
+             * @description Always `account_profile`.
+             * @enum {string}
+             */
+            object: "account_profile";
+            /**
+             * @description The account's name, trimmed, with control and invisible characters removed, at most 64 characters. `null` when the account has no name.
+             * @example Ada Lovelace
+             */
+            display_name: string | null;
+            /**
+             * @description One uppercase letter or digit: taken from `display_name`, else from the local part of the account's email, else `"?"`.
+             * @example A
+             */
+            initial: string;
+            /**
+             * @description The first character of the email's local part, then `•••`, `@` and the domain. `null` when the email is not known.
+             * @example a•••@example.com
+             */
+            email_hint: string | null;
+            /** @description `null` when the account has no profile picture. Otherwise the URL of `GET /v1/me/avatar` and the `ETag` of the current picture. */
+            avatar: components["schemas"]["AccountAvatar"] | null;
+        };
+        /** @description Where to fetch the account's profile picture, and its current version. */
+        AccountAvatar: {
+            /**
+             * Format: uri
+             * @description The absolute URL of `GET /v1/me/avatar`.
+             * @example https://api.devupai.com/v1/me/avatar
+             */
+            url: string;
+            /**
+             * @description Strong entity tag of the current picture, quotes included. The same value as the `ETag` header of `GET /v1/me/avatar`; it changes when the picture changes.
+             * @example "3f2a9c1b7d4e6a58"
+             */
+            etag: string;
         };
         HealthResponse: {
             /**
@@ -704,6 +1370,8 @@ export interface components {
         /** @description Invalid request body or parameters. */
         BadRequest: {
             headers: {
+                "x-request-id": components["headers"]["XRequestId"];
+                "x-client-request-id": components["headers"]["XClientRequestId"];
                 [name: string]: unknown;
             };
             content: {
@@ -720,14 +1388,17 @@ export interface components {
             };
         };
         /**
-         * @description Missing, empty, or revoked API key.
-         *     This response covers three distinct codes depending on the authentication path:
-         *     - `missing_api_key`: Authorization header absent or Bearer token is empty.
-         *     - `invalid_api_key`: Key not found, deactivated, or failed validation.
+         * @description Missing, empty, invalid, expired or revoked API key.
+         *     `error.code` is one of:
+         *     - `missing_api_key`: Authorization header absent or Bearer token is empty. On `GET /v1/models`, `GET /v1/models/{model}`, `GET /v1/me` and `GET /v1/me/avatar`, which also accept the `x-api-key` header, the message is "Provide your API key as: Authorization: Bearer sk-devup-..., or in the x-api-key header."
+         *     - `invalid_api_key`: Key not found, deactivated, or not valid.
+         *     - `token_expired`: The scoped JWT credential has passed its expiration time. When the expiration time is known, the message gives it.
          *     - `token_revoked`: The scoped JWT credential has been explicitly revoked.
          */
         Unauthorized: {
             headers: {
+                "x-request-id": components["headers"]["XRequestId"];
+                "x-client-request-id": components["headers"]["XClientRequestId"];
                 [name: string]: unknown;
             };
             content: {
@@ -739,9 +1410,13 @@ export interface components {
          *     - `account_suspended`: The DEVUP account is suspended; all requests are blocked.
          *     - `model_not_allowed`: The scoped credential does not grant access to the requested model.
          *       This code is never returned for unrestricted master API keys.
+         *     - `scoped_token_not_allowed`: On `GET /v1/me` and `GET /v1/me/avatar`, which accept
+         *       account API keys (`sk-devup-...`) only, a scoped token was sent.
          */
         Forbidden: {
             headers: {
+                "x-request-id": components["headers"]["XRequestId"];
+                "x-client-request-id": components["headers"]["XClientRequestId"];
                 [name: string]: unknown;
             };
             content: {
@@ -750,83 +1425,133 @@ export interface components {
         };
         /**
          * @description DZD balance depleted or scoped credential budget exhausted.
-         *     - `insufficient_balance`: The DEVUP account has insufficient available balance.
+         *     - `insufficient_balance`: The available balance of the DEVUP account does not cover the request.
          *     - `budget_exhausted`: The scoped credential has reached its configured budget.
          *       This code is never returned for unrestricted master API keys.
          */
         InsufficientBalance: {
             headers: {
+                "x-request-id": components["headers"]["XRequestId"];
+                "x-client-request-id": components["headers"]["XClientRequestId"];
                 [name: string]: unknown;
             };
             content: {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description Rate limit exceeded (100 requests per 60-second sliding window per account). */
+        /** @description Too many requests. `error.code` is `rate_limit_exceeded` (your account's per-minute limit), `model_at_capacity` (the model is momentarily at capacity; `Retry-After: 5` and `retry-after-ms: 5000`, no `X-RateLimit-*` headers), `concurrency_limit_exceeded`, `tpm_limit_exceeded`, or `flex_capacity_unavailable`. Wait the number of seconds in `Retry-After` before retrying. */
         RateLimited: {
             headers: {
-                /** @description Maximum requests allowed in the current window. */
-                "X-RateLimit-Limit"?: number;
-                /** @description Remaining requests in the current window. */
-                "X-RateLimit-Remaining"?: number;
-                /** @description Unix timestamp (ms) when the current window resets. */
-                "X-RateLimit-Reset"?: number;
-                /** @description Seconds until the rate limit resets. */
+                "x-request-id": components["headers"]["XRequestId"];
+                "x-client-request-id": components["headers"]["XClientRequestId"];
+                /** @description Seconds to wait before retrying. */
                 "Retry-After"?: number;
+                /** @description Milliseconds to wait before retrying (`model_at_capacity` only). */
+                "retry-after-ms"?: number;
+                /** @description Maximum requests allowed in the current window (per-minute limit only). */
+                "X-RateLimit-Limit"?: number;
+                /** @description Remaining requests in the current window (per-minute limit only). */
+                "X-RateLimit-Remaining"?: number;
+                /** @description Unix timestamp (ms) when the current window resets (per-minute limit only). */
+                "X-RateLimit-Reset"?: number;
+                /** @description Concurrency limit that was reached (concurrency limit only). */
+                "X-Concurrency-Limit"?: number;
+                /** @description Tokens-per-minute limit (TPM limit only). */
+                "X-TPM-Limit"?: number;
                 [name: string]: unknown;
             };
             content: {
-                /**
-                 * @example {
-                 *       "error": {
-                 *         "message": "Rate limit exceeded. Please slow down your requests and try again shortly.",
-                 *         "type": "devup_error",
-                 *         "code": "rate_limit_exceeded"
-                 *       }
-                 *     }
-                 */
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description The inference pipeline encountered a transient error. */
-        ComputeError: {
+        /**
+         * @description The request could not be completed. Retry later or contact support.
+         *
+         *     The example body is illustrative: `request_failed` is an example value of `error.code`.
+         */
+        RequestNotCompleted: {
             headers: {
+                "x-request-id": components["headers"]["XRequestId"];
+                "x-client-request-id": components["headers"]["XClientRequestId"];
                 [name: string]: unknown;
             };
             content: {
                 /**
                  * @example {
                  *       "error": {
-                 *         "message": "The DEVUP AI Inference Pipeline encountered a transient error. Please retry your request.",
+                 *         "message": "The request could not be completed. Retry later or contact support.",
                  *         "type": "devup_error",
-                 *         "code": "DEVUP_COMPUTE_ERROR"
+                 *         "code": "request_failed"
                  *       }
                  *     }
                  */
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description An unexpected internal error occurred. */
+        /**
+         * @description The request could not be completed. Retry later or contact support.
+         *
+         *     The example body is illustrative: `request_failed` is an example value of `error.code`.
+         */
         InternalError: {
             headers: {
+                "x-request-id": components["headers"]["XRequestId"];
+                "x-client-request-id": components["headers"]["XClientRequestId"];
                 [name: string]: unknown;
             };
             content: {
                 /**
                  * @example {
                  *       "error": {
-                 *         "message": "Internal server error.",
+                 *         "message": "The request could not be completed. Retry later or contact support.",
                  *         "type": "devup_error",
-                 *         "code": "internal_error"
+                 *         "code": "request_failed"
                  *       }
                  *     }
                  */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /**
+         * @description The request could not be completed. Retry later or contact support.
+         *
+         *     The example body is illustrative: `request_failed` is an example value of `error.code`.
+         */
+        Conflict: {
+            headers: {
+                "x-request-id": components["headers"]["XRequestId"];
+                "x-client-request-id": components["headers"]["XClientRequestId"];
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": {
+                 *         "message": "The request could not be completed. Retry later or contact support.",
+                 *         "type": "devup_error",
+                 *         "code": "request_failed"
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description The request was not accepted in its current form. */
+        UnprocessableRequest: {
+            headers: {
+                "x-request-id": components["headers"]["XRequestId"];
+                "x-client-request-id": components["headers"]["XClientRequestId"];
+                [name: string]: unknown;
+            };
+            content: {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
         /** @description The requested model identifier was not found in the catalog. It is not retryable unless the model identifier is changed. */
         NotFound: {
             headers: {
+                "x-request-id": components["headers"]["XRequestId"];
+                "x-client-request-id": components["headers"]["XClientRequestId"];
                 [name: string]: unknown;
             };
             content: {
@@ -836,6 +1561,8 @@ export interface components {
         /** @description Requests are temporarily paused or the requested model is temporarily unavailable. Retry according to the delay communicated in Retry-After and/or retry-after-ms when present. */
         ServiceUnavailable: {
             headers: {
+                "x-request-id": components["headers"]["XRequestId"];
+                "x-client-request-id": components["headers"]["XClientRequestId"];
                 /** @description Seconds to wait before retrying. */
                 "Retry-After"?: number;
                 /** @description Milliseconds to wait before retrying. */
@@ -849,7 +1576,14 @@ export interface components {
     };
     parameters: never;
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description DEVUP's unique identifier for this request, generated by DEVUP (it starts with `req_`). Returned on every response, success or error, from every `/v1` endpoint and from the Anthropic-compatible messages endpoint. The dashboard shows the same ID for billed requests; quote it when you contact support. Readable from browsers (listed in `Access-Control-Expose-Headers`). Not returned by `/health`. */
+        XRequestId: string;
+        /** @description Your own correlation ID, echoed back unchanged. Send it as the `x-client-request-id` request header, or as `x-request-id` when `x-client-request-id` is absent. Present only when the value you sent is 1–64 characters of letters, digits, `.`, `_`, `:` or `-`; any other value is not echoed. It never replaces `x-request-id`. */
+        XClientRequestId: string;
+        /** @description Informational notices about how the request was handled. Comma-separated; present only when there is at least one notice, on streamed and non-streamed responses alike. Readable from browsers (listed in `Access-Control-Expose-Headers`). */
+        XDevupWarnings: string;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -880,15 +1614,18 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful chat completion (non-streaming). */
+            /** @description Successful chat completion: a JSON object, or a Server-Sent Events stream when the request sets `stream: true`. */
             200: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    "X-DEVUP-Warnings": components["headers"]["XDevupWarnings"];
                     [name: string]: unknown;
                 };
                 content: {
                     /**
                      * @example {
-                     *       "id": "devup-12345678-abcd-1234-abcd-1234567890ab",
+                     *       "id": "chatcmpl-79037612-d7c2-43e0-8494-c560f97c61ea",
                      *       "object": "chat.completion",
                      *       "created": 1700000000,
                      *       "model": "deepseek-ai/DeepSeek-V4-Pro",
@@ -907,18 +1644,19 @@ export interface operations {
                      *         "completion_tokens": 8
                      *       },
                      *       "_devup": {
-                     *         "cost_dzd": 0.0012,
-                     *         "balance_dzd": 500
+                     *         "request_id": "req_9fd8ddec5b2149539860a86dccba58cf"
                      *       }
                      *     }
                      */
                     "application/json": components["schemas"]["ChatCompletionResponse"];
-                    "text/event-stream": string;
+                    "text/event-stream": components["schemas"]["ChatCompletionChunk"] | components["schemas"]["ChatCompletionStreamError"];
                 };
             };
             /** @description Invalid request body or parameters. */
             400: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -929,8 +1667,131 @@ export interface operations {
             402: components["responses"]["InsufficientBalance"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description The request body is larger than 10,485,760 bytes (10 MiB). Base64-encoded file data counts toward this limit. The body is not processed and the request is not charged. */
+            413: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "message": "The request body exceeds the limit of 10,485,760 bytes (10 MiB). Base64-encoded file data counts toward this limit.",
+                     *         "type": "devup_error",
+                     *         "code": "payload_too_large"
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            415: components["responses"]["UnprocessableRequest"];
+            422: components["responses"]["UnprocessableRequest"];
             429: components["responses"]["RateLimited"];
-            502: components["responses"]["ComputeError"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["RequestNotCompleted"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createResponse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "model": "openai/gpt-5.6-luna",
+                 *       "input": "Explain how quantum key distribution works in one paragraph.",
+                 *       "max_output_tokens": 512
+                 *     }
+                 */
+                "application/json": components["schemas"]["ResponsesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response generation: a Responses object as JSON, or a stream of Server-Sent Events when `stream: true`. */
+            200: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    "X-DEVUP-Warnings": components["headers"]["XDevupWarnings"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": "resp_01j8k9m0n1p2q3r4s5t6u7v8w9",
+                     *       "object": "response",
+                     *       "created_at": 1700000000,
+                     *       "model": "openai/gpt-5.6-luna",
+                     *       "status": "completed",
+                     *       "output": [
+                     *         {
+                     *           "id": "msg_01j8k9m0n1p2q3r4s5t6u7v8wa",
+                     *           "type": "message",
+                     *           "role": "assistant",
+                     *           "status": "completed",
+                     *           "content": [
+                     *             {
+                     *               "type": "output_text",
+                     *               "text": "Quantum key distribution uses principles of quantum mechanics...",
+                     *               "annotations": []
+                     *             }
+                     *           ]
+                     *         }
+                     *       ],
+                     *       "usage": {
+                     *         "input_tokens": 12,
+                     *         "output_tokens": 45,
+                     *         "total_tokens": 57
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ResponsesResponse"];
+                    /**
+                     * @example event: response.created
+                     *     data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_01j8k9m0n1p2q3r4s5t6u7v8w9","object":"response","created_at":1700000000,"model":"deepseek-ai/DeepSeek-V4-Pro","status":"in_progress","output":[],"usage":null}}
+                     *
+                     *     event: response.output_text.delta
+                     *     data: {"type":"response.output_text.delta","sequence_number":4,"item_id":"msg_01j8k9m0n1p2q3r4s5t6u7v8wa","output_index":0,"content_index":0,"delta":"Golden dunes"}
+                     *
+                     *     event: response.output_item.done
+                     *     data: {"type":"response.output_item.done","sequence_number":9,"output_index":0,"item":{"id":"msg_01j8k9m0n1p2q3r4s5t6u7v8wa","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"Golden dunes at dawn...","annotations":[]}]}}
+                     *
+                     *     event: response.completed
+                     *     data: {"type":"response.completed","sequence_number":10,"response":{"id":"resp_01j8k9m0n1p2q3r4s5t6u7v8w9","object":"response","created_at":1700000000,"model":"deepseek-ai/DeepSeek-V4-Pro","status":"completed","output":[{"id":"msg_01j8k9m0n1p2q3r4s5t6u7v8wa","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"Golden dunes at dawn...","annotations":[]}]}],"usage":{"input_tokens":14,"output_tokens":21,"total_tokens":35}}}
+                     */
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Invalid request body or unsupported parameters. */
+            400: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            402: components["responses"]["InsufficientBalance"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnprocessableRequest"];
+            422: components["responses"]["UnprocessableRequest"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["RequestNotCompleted"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -957,6 +1818,8 @@ export interface operations {
             /** @description Embedding vectors generated successfully. */
             200: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -980,8 +1843,7 @@ export interface operations {
                      *         "total_tokens": 2
                      *       },
                      *       "_devup": {
-                     *         "cost_dzd": 0.0001,
-                     *         "balance_dzd": 500
+                     *         "request_id": "req_9fd8ddec5b2149539860a86dccba58cf"
                      *       }
                      *     }
                      */
@@ -991,6 +1853,8 @@ export interface operations {
             /** @description Invalid request body or parameters. */
             400: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -999,9 +1863,14 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnprocessableRequest"];
+            422: components["responses"]["UnprocessableRequest"];
             429: components["responses"]["RateLimited"];
-            502: components["responses"]["ComputeError"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["RequestNotCompleted"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -1019,7 +1888,7 @@ export interface operations {
                  *       "model": "Qwen/Qwen3-Reranker-8B",
                  *       "query": "What is DEVUP AI?",
                  *       "documents": [
-                 *         "DEVUP AI is a unified AI gateway.",
+                 *         "DEVUP AI is an API for open-source and frontier models.",
                  *         "Paris is the capital of France."
                  *       ]
                  *     }
@@ -1031,6 +1900,8 @@ export interface operations {
             /** @description Documents reranked successfully. */
             200: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1049,8 +1920,7 @@ export interface operations {
                      *         }
                      *       ],
                      *       "_devup": {
-                     *         "cost_dzd": 0.0001,
-                     *         "balance_dzd": 500
+                     *         "request_id": "req_9fd8ddec5b2149539860a86dccba58cf"
                      *       }
                      *     }
                      */
@@ -1060,6 +1930,8 @@ export interface operations {
             /** @description Invalid request body or parameters. */
             400: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1070,8 +1942,12 @@ export interface operations {
             402: components["responses"]["InsufficientBalance"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnprocessableRequest"];
+            422: components["responses"]["UnprocessableRequest"];
             429: components["responses"]["RateLimited"];
-            502: components["responses"]["ComputeError"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["RequestNotCompleted"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -1109,6 +1985,8 @@ export interface operations {
             /** @description Image generated successfully. */
             200: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1116,24 +1994,38 @@ export interface operations {
                      * @example {
                      *       "data": [
                      *         {
-                     *           "url": "https://api.devupai.com/storage/generations/img_example_1700000000.png"
+                     *           "url": "https://api.devupai.com/v1/images/proxy?d=<token>&s=<signature>"
                      *         }
                      *       ],
                      *       "_devup": {
-                     *         "cost_dzd": 5,
-                     *         "balance_dzd": 495
+                     *         "request_id": "req_9fd8ddec5b2149539860a86dccba58cf"
                      *       }
                      *     }
                      */
                     "application/json": components["schemas"]["ImageGenerationResponse"];
                 };
             };
-            400: components["responses"]["BadRequest"];
+            /** @description Invalid request body or parameters. */
+            400: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnprocessableRequest"];
+            422: components["responses"]["UnprocessableRequest"];
             429: components["responses"]["RateLimited"];
-            502: components["responses"]["ComputeError"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["RequestNotCompleted"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -1141,10 +2033,15 @@ export interface operations {
         parameters: {
             query: {
                 /**
-                 * @description The full URL of the image to proxy. Must be from an allowed domain.
-                 * @example https://api.devupai.com/storage/generations/img_example.png
+                 * @description Opaque value from the returned link.
+                 * @example <token>
                  */
-                url: string;
+                d: string;
+                /**
+                 * @description Opaque value from the returned link.
+                 * @example <signature>
+                 */
+                s: string;
             };
             header?: never;
             path?: never;
@@ -1152,9 +2049,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Image binary data. */
+            /** @description The generated file. */
             200: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    /** @description Size of the file, in bytes. */
+                    "Content-Length"?: number;
+                    /** @description The file can be fetched in parts with a `Range` request header. */
+                    "Accept-Ranges"?: string;
+                    /** @description Always `private, no-store`. Download the file and keep your own copy. */
                     "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
@@ -1163,35 +2067,93 @@ export interface operations {
                     "image/jpeg": string;
                     "image/webp": string;
                     "image/gif": string;
+                    "video/mp4": string;
+                    "video/quicktime": string;
+                    "video/webm": string;
+                    "audio/mpeg": string;
+                    "audio/opus": string;
+                    "audio/aac": string;
+                    "audio/flac": string;
+                    "audio/wav": string;
+                    "audio/pcm": string;
                 };
             };
-            /** @description Missing or invalid URL parameter. */
-            400: {
+            /** @description Part of the file, for a request with one `Range: bytes=<start>-<end>` header (or `bytes=<start>-`, or `bytes=-<length>`). The content type is the file's own. A `Range` header in any other form is answered with the whole file (HTTP 200). */
+            206: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    /** @description The bytes returned and the size of the whole file. */
+                    "Content-Range"?: string;
+                    /** @description Size of this part, in bytes. */
+                    "Content-Length"?: number;
+                    "Accept-Ranges"?: string;
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    /** @example Missing URL */
-                    "text/plain": string;
+                    "image/*": string;
+                    "video/*": string;
+                    "audio/*": string;
                 };
             };
-            /** @description Domain not in the allowlist. */
+            /** @description The link is not valid: `d` or `s` is missing or does not match, or the link has expired. Use the url returned by the generation endpoint before it expires, or request the file again. */
             403: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
-                    /** @example Forbidden: Domain not allowed */
+                    /** @example Forbidden */
                     "text/plain": string;
                 };
             };
-            /** @description Failed to fetch the upstream image. */
-            502: {
+            /** @description The file is not available. */
+            404: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
-                    /** @example Failed to load image */
+                    /** @example Image not available */
+                    "text/plain": string;
+                };
+            };
+            /** @description The requested range cannot be served from this file (it starts at or after the end of the file). The body is empty. */
+            416: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    /** @description The size of the whole file, when it is known. */
+                    "Content-Range"?: string;
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The file is temporarily unavailable. Retry the request. */
+            500: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /** @example Image not available */
+                    "text/plain": string;
+                };
+            };
+            /** @description The image is not available. */
+            502: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /** @example Image not available */
                     "text/plain": string;
                 };
             };
@@ -1209,7 +2171,7 @@ export interface operations {
                 /**
                  * @example {
                  *       "model": "tts-1",
-                 *       "input": "Welcome to DEVUP AI, the gateway to open-source models.",
+                 *       "input": "Welcome to DEVUP AI.",
                  *       "voice": "aura-asteria-en",
                  *       "response_format": "mp3"
                  *     }
@@ -1221,15 +2183,16 @@ export interface operations {
             /** @description Audio generated and stored successfully. */
             200: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
                     /**
                      * @example {
-                     *       "url": "https://api.devupai.com/storage/audio/tts_example_1700000000.mp3",
+                     *       "url": "https://api.devupai.com/v1/images/proxy?d=<token>&s=<signature>",
                      *       "_devup": {
-                     *         "cost_dzd": 0.5,
-                     *         "balance_dzd": 499.5
+                     *         "request_id": "req_9fd8ddec5b2149539860a86dccba58cf"
                      *       }
                      *     }
                      */
@@ -1239,6 +2202,8 @@ export interface operations {
             /** @description Invalid request body or parameters. */
             400: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1247,9 +2212,28 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnprocessableRequest"];
+            422: components["responses"]["UnprocessableRequest"];
             429: components["responses"]["RateLimited"];
-            502: components["responses"]["ComputeError"];
+            500: components["responses"]["InternalError"];
+            /**
+             * @description The request could not be completed. Retry later or contact support.
+             *
+             *     The example body is illustrative: `request_failed` is an example value of `error.code`.
+             */
+            502: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -1269,6 +2253,8 @@ export interface operations {
             /** @description Transcription completed successfully. */
             200: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1282,7 +2268,10 @@ export interface operations {
                      *           "end": 2.5,
                      *           "text": "Hello, this is a test recording."
                      *         }
-                     *       ]
+                     *       ],
+                     *       "_devup": {
+                     *         "request_id": "req_3c1e0a9b7d2f4e6a8b0c2d4e6f8a0b1c"
+                     *       }
                      *     }
                      */
                     "application/json": components["schemas"]["TranscriptionResponse"] | components["schemas"]["TranscriptionVerboseResponse"];
@@ -1293,9 +2282,14 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnprocessableRequest"];
+            422: components["responses"]["UnprocessableRequest"];
             429: components["responses"]["RateLimited"];
-            502: components["responses"]["ComputeError"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["RequestNotCompleted"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -1322,6 +2316,8 @@ export interface operations {
             /** @description Video generated successfully. */
             200: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1329,25 +2325,40 @@ export interface operations {
                      * @example {
                      *       "data": [
                      *         {
-                     *           "url": "https://api.devupai.com/storage/generations/vid_example_1700000000.mp4"
+                     *           "url": "https://api.devupai.com/v1/images/proxy?d=<token>&s=<signature>"
                      *         }
                      *       ],
                      *       "_devup": {
-                     *         "cost_dzd": 25,
-                     *         "balance_dzd": 475
+                     *         "request_id": "req_9fd8ddec5b2149539860a86dccba58cf"
                      *       }
                      *     }
                      */
                     "application/json": components["schemas"]["VideoGenerationResponse"];
                 };
             };
-            400: components["responses"]["BadRequest"];
+            /** @description Invalid request body or parameters. */
+            400: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Rate limit or concurrency limit exceeded. This endpoint applies two independent limits: (1) 100 requests per 60-second sliding window per account — returns standard rate-limit headers. (2) 150 globally in-flight video generation requests — when this threshold is exceeded, a 429 is returned with Retry-After: 5 and retry-after-ms: 5000 and no rate-limit headers. */
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnprocessableRequest"];
+            422: components["responses"]["UnprocessableRequest"];
+            /** @description Too many requests. `error.code` is `rate_limit_exceeded` (your account's per-minute limit; the standard rate-limit headers are sent) or `model_at_capacity` (the model is momentarily at capacity; the response carries `Retry-After: 5` and `retry-after-ms: 5000`, and no rate-limit headers). Wait the number of seconds in `Retry-After` before retrying. */
             429: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     /** @description Seconds to wait before retrying (5 for model at capacity; varies for rate limit). */
                     "Retry-After"?: number;
                     /** @description Milliseconds to wait before retrying (model_at_capacity only). */
@@ -1358,7 +2369,8 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            502: components["responses"]["ComputeError"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["RequestNotCompleted"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -1374,6 +2386,8 @@ export interface operations {
             /** @description Model list retrieved successfully. */
             200: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1383,15 +2397,25 @@ export interface operations {
                      *       "data": [
                      *         {
                      *           "id": "deepseek-ai/DeepSeek-V4-Pro",
+                     *           "name": "DeepSeek-V4-Pro",
                      *           "object": "model",
-                     *           "created": 1700000000,
-                     *           "owned_by": "devupai"
+                     *           "created": 1780741344,
+                     *           "owned_by": "deepseek-ai",
+                     *           "type": "text-generation",
+                     *           "is_replaced": false,
+                     *           "tool_choice": {
+                     *             "required": false,
+                     *             "function": false
+                     *           }
                      *         },
                      *         {
                      *           "id": "Qwen/Qwen3-Embedding-8B",
+                     *           "name": "Qwen3-Embedding-8B",
                      *           "object": "model",
-                     *           "created": 1700000100,
-                     *           "owned_by": "devupai"
+                     *           "created": 1781012488,
+                     *           "owned_by": "Qwen",
+                     *           "type": "embeddings",
+                     *           "is_replaced": false
                      *         }
                      *       ]
                      *     }
@@ -1399,13 +2423,84 @@ export interface operations {
                     "application/json": components["schemas"]["ModelListResponse"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             /** @description Endpoint not found. */
             404: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content?: never;
             };
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    retrieveModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description The model ID exactly as listed in `GET /v1/models`, for example `deepseek-ai/DeepSeek-V4-Pro`. It contains a slash and is sent as-is (`/v1/models/deepseek-ai/DeepSeek-V4-Pro`); the URL-encoded form `deepseek-ai%2FDeepSeek-V4-Pro` also works.
+                 * @example deepseek-ai/DeepSeek-V4-Pro
+                 */
+                model: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The model object. */
+            200: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": "deepseek-ai/DeepSeek-V4-Pro",
+                     *       "name": "DeepSeek-V4-Pro",
+                     *       "object": "model",
+                     *       "created": 1780741344,
+                     *       "owned_by": "deepseek-ai",
+                     *       "type": "text-generation",
+                     *       "is_replaced": false
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ModelObject"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description No model with this ID exists. */
+            404: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "message": "The model \"deepseek-ai/DeepSeek-V9\" does not exist. List available models with GET /v1/models.",
+                     *         "type": "devup_error",
+                     *         "code": "model_not_found"
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     createNativeInference: {
@@ -1432,7 +2527,7 @@ export interface operations {
                 "application/json": {
                     /**
                      * Format: uri
-                     * @description Optional callback URL for asynchronous delivery of inference results. This field is honoured on this native inference endpoint only and silently ignored on OpenAI-compatible routes.
+                     * @description Optional callback URL for asynchronous delivery of inference results. This field is honoured on this native inference endpoint only; it has no effect on the OpenAI-compatible endpoints.
                      */
                     webhook?: string;
                 } & {
@@ -1444,15 +2539,22 @@ export interface operations {
             /** @description Inference completed successfully. Response schema is model-dependent. */
             200: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
                         _devup?: components["schemas"]["DevUpBilling"] | {
-                            /** @description Funds held in Algerian Dinar (DZD) pending completion. */
+                            /** @description Estimated cost of the request in Algerian Dinar (DZD). The final cost is `cost_dzd` in the webhook callback. */
                             reserved_dzd: number;
-                            /** @enum {string} */
+                            /**
+                             * @description Status of the charge.
+                             * @enum {string}
+                             */
                             status: "pending_settlement";
+                            /** @description Equal to the `x-request-id` response header. */
+                            request_id?: string;
                         };
                     } & {
                         [key: string]: unknown;
@@ -1462,9 +2564,14 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnprocessableRequest"];
+            422: components["responses"]["UnprocessableRequest"];
             429: components["responses"]["RateLimited"];
-            502: components["responses"]["ComputeError"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["RequestNotCompleted"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -1480,6 +2587,8 @@ export interface operations {
             /** @description Balance retrieved successfully. */
             200: {
                 headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1494,6 +2603,107 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    getAccountProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account profile. */
+            200: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    /** @description Always `private, max-age=300`. */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountProfile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getAccountAvatar: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description The `ETag` of a copy you already have. When it matches the current picture, the response is `304 Not Modified` with no body.
+                 * @example "3f2a9c1b7d4e6a58"
+                 */
+                "If-None-Match"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The profile picture. */
+            200: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    /** @description Strong entity tag of the current picture; the same value as `avatar.etag` in `GET /v1/me`. */
+                    ETag?: string;
+                    /** @description Always `private, max-age=86400`. */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/webp": string;
+                };
+            };
+            /** @description Not Modified. The `If-None-Match` value matches the current picture; the body is empty. */
+            304: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    /** @description Strong entity tag of the current picture. */
+                    ETag?: string;
+                    /** @description Always `private, max-age=86400`. */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description The account has no profile picture. */
+            404: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "message": "This account has no profile picture.",
+                     *         "type": "devup_error",
+                     *         "code": "avatar_not_found"
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     healthCheck: {
@@ -1558,7 +2768,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        /** @description Inbound delivery payload containing inference results or failure details. `results` and `error` are mutually exclusive. */
+        /** @description Inbound delivery payload containing inference results or error details. `results` and `error` are mutually exclusive. */
         requestBody: {
             content: {
                 "application/json": {
@@ -1578,11 +2788,11 @@ export interface operations {
                     };
                     /**
                      * Format: double
-                     * @description Final settled cost in Algerian Dinar (DZD).
+                     * @description Final cost of the request in Algerian Dinar (DZD).
                      */
                     cost_dzd: number;
                     /**
-                     * @description Billing settlement status.
+                     * @description Status of the charge.
                      * @enum {string}
                      */
                     settlement: "settled";
@@ -1594,32 +2804,32 @@ export interface operations {
                     /** @description Webhook delivery identifier (`whd_<uuid>`). */
                     id: string;
                     /**
-                     * @description Status indicating failed inference.
+                     * @description The inference did not complete.
                      * @enum {string}
                      */
                     status: "failed";
-                    /** @description Token consumption (0 tokens on failure). */
+                    /** @description Token consumption for the request. */
                     usage: {
-                        /** @description Number of prompt tokens processed (0 on failure). */
+                        /** @description Number of prompt tokens processed. */
                         prompt_tokens: number;
-                        /** @description Number of completion tokens generated (0 on failure). */
+                        /** @description Number of completion tokens generated. */
                         completion_tokens: number;
                     };
                     /**
                      * Format: double
-                     * @description Settled cost in DZD (`null` on failure).
+                     * @description Final cost of the request in Algerian Dinar (DZD), or `null`.
                      */
                     cost_dzd: number | null;
                     /**
-                     * @description Billing settlement status.
+                     * @description Status of the charge.
                      * @enum {string}
                      */
                     settlement: "failed";
-                    /** @description Details of the failure. */
+                    /** @description Why the inference did not complete. */
                     error: {
                         /** @description Error classification code. */
                         type: string;
-                        /** @description Human-readable failure explanation. */
+                        /** @description Human-readable explanation. */
                         message: string;
                     };
                 };

@@ -1,6 +1,5 @@
 * text=auto
 
-# Hashed byte-exact by the OpenAPI provenance gate. Never normalise line endings.
-audit/openapi/devupai-v1.yaml   -text
-audit/openapi/PROVENANCE.json   -text
-tests/fixtures/openapi.json     -text
+# Hashed byte-exact by `npm run check:types` (openapi/SPEC_SHA256). Never normalise line endings.
+openapi/devupai-v1.yaml     -text
+openapi/SPEC_SHA256         -text

@@ -5,11 +5,11 @@
 ### Added
 
 - **Reasoning Fields in Chat & Streaming:** Added `reasoning_content?: string | null` to `ChatCompletionMessage` and `ChatCompletionChunkDelta`, exposing model thinking traces in both non-streaming and streaming chat completions.
-- **Reasoning Tokens in Usage:** Added `reasoning_tokens?: number` to `TokenUsage`, supporting token accounting for providers that return reasoning token breakdowns.
+- **Reasoning Tokens in Usage:** Added `reasoning_tokens?: number` to `TokenUsage`, for models that return a reasoning token count.
 - **Webhook Signature Verification:** Added `verifyWebhookSignature()` and `constructWebhookEvent()` standalone helpers alongside `client.webhooks` resource namespace for verifying inbound DEVUP AI webhook delivery callbacks. Implemented with Web Crypto API (`crypto.subtle`) for zero-dependency compatibility across Node.js 18+, Edge runtimes, Cloudflare Workers, Deno, Bun, and browsers.
 - **`DevupWebhookVerificationError` Class:** Exported dedicated verification error class with granular `reason` codes (`malformed_header`, `timestamp_outside_tolerance`, `no_matching_signature`, `invalid_json`).
 - **Webhook Payload Types:** Exported `WebhookEvent`, `WebhookSuccessPayload`, `WebhookErrorPayload`, and `WebhookUsage` interfaces.
-- **`rerank.create` Restored:** The `rerank.create()` method has been restored as a first-class feature in the SDK, matching the newly deployed dedicated `/v1/rerank` backend endpoint. This supersedes the `3.0.0` deprecation notice which previously instructed users to route these requests through the generic `inference.run()` proxy.
+- **`rerank.create` Restored:** The `rerank.create()` method has been restored as a first-class feature in the SDK, matching the `/v1/rerank` endpoint. This supersedes the `3.0.0` deprecation notice which previously instructed users to send these requests with the generic `inference.run()` method.
 
 ## [3.0.0] - 2026-08-05
 
@@ -18,8 +18,8 @@
 - **TypeScript & OpenAPI Alignment:** The SDK's public types are now strictly derived from the official DEVUP AI OpenAPI V1 contract (`openapi/devupai-v1.yaml`).
 - **New `inference.run()` Method:** Provides a generic, unified interface to execute requests against DEVUP AI's specialized models.
 - **`health.check()` Export:** Health check capabilities are now publicly exposed on the `client.health.check()` endpoint. Does not require `Authorization`.
-- **`images.proxy()` Export:** Exposes DEVUP AI's image proxy service explicitly to securely download upstream assets. Returns a native `Response`. Does not require `Authorization`.
-- **Vercel AI SDK Integration:** Maintained compatibility with `@ai-sdk/openai-compatible` for drop-in usage as a Vercel AI SDK Provider.
+- **`images.proxy()` Export:** Fetches a generated image from a URL returned by the API. Returns a native `Response`. Does not require `Authorization`.
+- **Vercel AI SDK Integration:** Maintained compatibility with `@ai-sdk/openai-compatible` for drop-in use with the Vercel AI SDK.
 
 ### Changed
 
@@ -30,5 +30,5 @@
 
 ### Removed
 
-- **`reranking.create` Resource:** The standalone reranking resource has been removed, as the `devup-rerank` models are served through the native inference proxy. Users should migrate to `client.inference.run()`.
+- **`reranking.create` Resource:** The standalone reranking resource has been removed; reranking models are available through `client.inference.run()`. Users should migrate to `client.inference.run()`.
 - **Unsupported Request Formats:** Cleaned up several undocumented body fields on `audio.transcriptions`.
