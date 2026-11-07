@@ -1376,6 +1376,13 @@ paths:
                       message: "Invalid response_format. Accepted values are 'url' or 'b64_json'."
                       type: devup_error
                       code: invalid_response_format
+                invalid_value:
+                  summary: The resolution is not one the model offers
+                  value:
+                    error:
+                      message: '`4k` is not available for this model. Available: `720p`, `1080p`.'
+                      type: devup_error
+                      code: invalid_value
         '401':
           $ref: '#/components/responses/Unauthorized'
         '402':
@@ -3811,6 +3818,16 @@ components:
         seed:
           type: integer
           description: Random seed for reproducibility.
+        resolution:
+          type: string
+          example: '1080p'
+          description: >
+            The output resolution of the video, for models that offer several.
+            Each model lists the values it accepts on its model page; values are
+            case-insensitive. When omitted, the model's default resolution is
+            used. A value the model does not offer returns HTTP 400
+            `invalid_value`, and the message lists the accepted values. The price
+            depends on the resolution; see the model page.
         response_format:
           type: string
           enum: [url, b64_json]

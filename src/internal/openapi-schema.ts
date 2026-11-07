@@ -1116,6 +1116,11 @@ export interface components {
             /** @description Random seed for reproducibility. */
             seed?: number;
             /**
+             * @description The output resolution of the video, for models that offer several. Each model lists the values it accepts on its model page; values are case-insensitive. When omitted, the model's default resolution is used. A value the model does not offer returns HTTP 400 `invalid_value`, and the message lists the accepted values. The price depends on the resolution; see the model page.
+             * @example 1080p
+             */
+            resolution?: string;
+            /**
              * @description How the video is returned: `url` returns a temporary link in `data[0].url`; `b64_json` returns the video bytes base64-encoded in `data[0].b64_json`. A video larger than the inline size limit is returned in `data[0].url`, and `_devup.note` says so. Any other value returns HTTP 400 `invalid_response_format`.
              * @default url
              * @enum {string}
