@@ -175,7 +175,7 @@ export interface paths {
         put?: never;
         /**
          * Generate a video from a text prompt
-         * @description Creates a video from a text prompt or edits an existing video. Supports both JSON and multipart/form-data for video editing workflows. Returns a URL to the generated video.
+         * @description Creates a video from a text prompt or edits an existing video. Supports both JSON and multipart/form-data for video editing workflows. Returns a URL to the generated video. On models that list them, video options (duration, aspect ratio, audio, a first or last frame image, and more) are set by the fields of `VideoGenerationRequest`; multipart/form-data also carries the frame images as files.
          */
         post: operations["createVideoGeneration"];
         delete?: never;
@@ -383,7 +383,7 @@ export interface components {
             balance_dzd?: number;
             /** @description Equal to the `x-request-id` response header. Returned by chat completions, Responses, embeddings, rerank, image generation, speech, transcription, inference and video. */
             request_id?: string;
-            /** @description Informational notices about how the request was handled. Returned by chat completions and Responses without streaming, only when there is at least one. */
+            /** @description Informational notices about how the request was handled. Returned by chat completions and Responses without streaming, and by video generation, only when there is at least one. */
             warnings?: string[];
             /** @description `POST /v1/video/generations` only: present when `response_format` is `b64_json` and the video is larger than the size returned inline. The video is then returned as a URL in `data[].url`, and this note says so. */
             note?: string;
@@ -1100,21 +1100,52 @@ export interface components {
             })[];
             _devup: components["schemas"]["DevUpBilling"];
         };
+        /** @description Models offer different options. Each model lists its options, and the values it accepts, on its model page. The rules below apply to models that list options; a model that lists none generates the video from `prompt` and, where it offers several, `resolution`. An option left out takes the model's default value. On models that list options, an option the model does not list returns HTTP 400 `unsupported_parameter` (`unsupported_content` for `image` and `last_frame_image`); `seed`, `negative_prompt`, `num_frames` and parameters this schema does not define are answered without them, with the notice `parameter_not_supported`. A value or combination the model does not accept returns HTTP 400 `invalid_value`, and the message names what the model accepts. When a parameter and one of its aliases are both sent, the parameter applies, with the notice `parameter_superseded`; two aliases with different values return HTTP 400 `invalid_value`. The request body can be at most 10 MiB (10,485,760 bytes), images included. */
         VideoGenerationRequest: {
             /** @description Video generation model identifier. */
             model: string;
             /** @description Text description of the desired video. */
             prompt: string;
-            /** @description Text description of what to avoid. */
+            /** @description What to keep out of the video, up to the length the model lists on its model page. Used only when sent. */
             negative_prompt?: string;
-            /** @description Number of frames to generate. */
+            /**
+             * @deprecated
+             * @description Deprecated. Use `duration`.
+             */
             num_frames?: number;
-            /** @description Video width in pixels. */
+            /** @description Output width in pixels. Send it together with `height`: the pair selects the output size, as `size` does, on models whose outputs have exact sizes. When `size` is also sent, `size` applies. */
             width?: number;
-            /** @description Video height in pixels. */
+            /** @description Output height in pixels. Send it together with `width`; see `width`. */
             height?: number;
-            /** @description Random seed for reproducibility. */
+            /** @description Seed for repeatable results, inside the range the model lists on its model page. Used only when sent. */
             seed?: number;
+            /**
+             * @description Length of the video, in seconds. Alias: `seconds`. Each model lists the values it accepts on its model page.
+             * @example 8
+             */
+            duration?: number;
+            /**
+             * @description Aspect ratio as `W:H`. On some models it works together with `resolution` to select the output size. Each model lists the values it accepts on its model page.
+             * @example 16:9
+             */
+            aspect_ratio?: string;
+            /**
+             * @description Exact output size as `WIDTHxHEIGHT`, on models whose outputs have exact sizes; it selects the matching resolution and aspect ratio. Alias: `width` and `height`, sent together. A size the model does not offer returns HTTP 400 `invalid_value`, and the message lists the sizes it offers.
+             * @example 1280x720
+             */
+            size?: string;
+            /** @description Whether the video has an audio track. Alias: `audio`. Each model lists the values it accepts on its model page. */
+            generate_audio?: boolean;
+            /**
+             * @description Frame rate, in frames per second. Alias: `frame_rate`. Each model lists the values it accepts on its model page.
+             * @example 24
+             */
+            fps?: number;
+            /** @description A camera movement. Each model lists the values it accepts on its model page. */
+            camera_motion?: string;
+            image?: components["schemas"]["VideoFrameImage"];
+            /** @description The last frame of the video, in the same forms as `image`, on models that list `last_frame_image`. Aliases: `last_frame`, `end_image_url`, `tail_image_url`. */
+            last_frame_image?: components["schemas"]["VideoFrameImage"];
             /**
              * @description The output resolution of the video, for models that offer several. Each model lists the values it accepts on its model page; values are case-insensitive. When omitted, the model's default resolution is used. A value the model does not offer returns HTTP 400 `invalid_value`, and the message lists the accepted values. The price depends on the resolution; see the model page.
              * @example 1080p
@@ -1122,6 +1153,52 @@ export interface components {
             resolution?: string;
             /**
              * @description How the video is returned: `url` returns a temporary link in `data[0].url`; `b64_json` returns the video bytes base64-encoded in `data[0].b64_json`. A video larger than the inline size limit is returned in `data[0].url`, and `_devup.note` says so. Any other value returns HTTP 400 `invalid_response_format`.
+             * @default url
+             * @enum {string}
+             */
+            response_format?: "url" | "b64_json";
+        };
+        /** @description The first frame of the video, on models that list `image`. A publicly reachable HTTPS URL on the standard port, or a data URI (`data:image/png;base64,...`, `data:image/jpeg;base64,...` or `data:image/webp;base64,...`), as a string or as `{"image_url": "..."}`. PNG, JPEG or WebP, at most 10 MB and at most 4096 pixels on a side; the type is read from the image itself. Images are kept only for the request and deleted within 30 minutes. An image that cannot be used returns HTTP 400 `invalid_value`; a model that needs a first frame returns HTTP 400 `missing_required_parameter` when it is missing. Aliases: `first_frame_image`, `image_url`, `input_reference`. */
+        VideoFrameImage: string | {
+            /** @description An HTTPS URL or a data URI. */
+            image_url: string;
+        };
+        /** @description A video generation request as `multipart/form-data`, to send the first or last frame as a file. The fields are those of `VideoGenerationRequest`; whole numbers and booleans are sent as text (`8`, `true`). */
+        VideoGenerationFormRequest: {
+            /** @description Video generation model identifier. */
+            model: string;
+            /** @description Text description of the desired video. */
+            prompt: string;
+            /**
+             * Format: binary
+             * @description The first frame, as a PNG, JPEG or WebP file, at most 10 MB and at most 4096 pixels on a side, on models that list `image`. The field can also carry an `https://` URL or a data URI as text.
+             */
+            image?: string;
+            /**
+             * Format: binary
+             * @description The last frame, in the same form as `image`, on models that list `last_frame_image`. The field can also carry an `https://` URL or a data URI as text.
+             */
+            last_frame_image?: string;
+            /** @description Length of the video, in seconds. See `VideoGenerationRequest`. */
+            duration?: number;
+            /** @description Aspect ratio as `W:H`. See `VideoGenerationRequest`. */
+            aspect_ratio?: string;
+            /** @description Exact output size as `WIDTHxHEIGHT`. See `VideoGenerationRequest`. */
+            size?: string;
+            /** @description Whether the video has an audio track. See `VideoGenerationRequest`. */
+            generate_audio?: boolean;
+            /** @description Frame rate, in frames per second. See `VideoGenerationRequest`. */
+            fps?: number;
+            /** @description A camera movement. See `VideoGenerationRequest`. */
+            camera_motion?: string;
+            /** @description Seed for repeatable results. See `VideoGenerationRequest`. */
+            seed?: number;
+            /** @description What to keep out of the video. See `VideoGenerationRequest`. */
+            negative_prompt?: string;
+            /** @description The output resolution of the video. See `VideoGenerationRequest`. */
+            resolution?: string;
+            /**
+             * @description How the video is returned. See `VideoGenerationRequest`.
              * @default url
              * @enum {string}
              */
@@ -2307,14 +2384,8 @@ export interface operations {
         };
         requestBody: {
             content: {
-                /**
-                 * @example {
-                 *       "model": "example-org/example-video-model",
-                 *       "prompt": "A cat astronaut floating in space"
-                 *     }
-                 */
                 "application/json": components["schemas"]["VideoGenerationRequest"];
-                "multipart/form-data": components["schemas"]["VideoEditRequest"];
+                "multipart/form-data": components["schemas"]["VideoEditRequest"] | components["schemas"]["VideoGenerationFormRequest"];
             };
         };
         responses: {
@@ -2323,6 +2394,7 @@ export interface operations {
                 headers: {
                     "x-request-id": components["headers"]["XRequestId"];
                     "x-client-request-id": components["headers"]["XClientRequestId"];
+                    "X-DEVUP-Warnings": components["headers"]["XDevupWarnings"];
                     [name: string]: unknown;
                 };
                 content: {

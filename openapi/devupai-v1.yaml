@@ -1318,7 +1318,11 @@ paths:
       description: >
         Creates a video from a text prompt or edits an existing video.
         Supports both JSON and multipart/form-data for video editing
-        workflows. Returns a URL to the generated video.
+        workflows. Returns a URL to the generated video. On models that list
+        them, video options (duration, aspect ratio, audio, a first or last
+        frame image, and more) are set by the fields of
+        `VideoGenerationRequest`; multipart/form-data also carries the frame
+        images as files.
       tags: [Video]
       requestBody:
         required: true
@@ -1326,12 +1330,26 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/VideoGenerationRequest'
-            example:
-              model: example-org/example-video-model
-              prompt: A cat astronaut floating in space
+            examples:
+              basic:
+                summary: Prompt only
+                value:
+                  model: example-org/example-video-model
+                  prompt: A cat astronaut floating in space
+              options:
+                summary: Video options and a first frame (values from the model page)
+                value:
+                  model: example-org/example-video-model
+                  prompt: A paper boat drifting down a rain-soaked street at dusk.
+                  duration: 8
+                  aspect_ratio: '16:9'
+                  generate_audio: true
+                  image: https://example.com/first-frame.png
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/VideoEditRequest'
+              anyOf:
+                - $ref: '#/components/schemas/VideoEditRequest'
+                - $ref: '#/components/schemas/VideoGenerationFormRequest'
       responses:
         '200':
           headers:
@@ -1339,6 +1357,8 @@ paths:
               $ref: '#/components/headers/XRequestId'
             x-client-request-id:
               $ref: '#/components/headers/XClientRequestId'
+            X-DEVUP-Warnings:
+              $ref: '#/components/headers/XDevupWarnings'
           description: Video generated successfully.
           content:
             application/json:
@@ -1383,6 +1403,48 @@ paths:
                       message: '`4k` is not available for this model. Available: `720p`, `1080p`.'
                       type: devup_error
                       code: invalid_value
+                invalid_value_option:
+                  summary: A video option value the model does not accept
+                  value:
+                    error:
+                      message: '`7` is not available for `duration` on this model. Available: 6, 8, 10, 12.'
+                      type: devup_error
+                      code: invalid_value
+                invalid_value_combination:
+                  summary: A combination of options the model does not accept
+                  value:
+                    error:
+                      message: '`duration` 12 is not available with `resolution` `1080p` on this model. Available: 6, 8, 10.'
+                      type: devup_error
+                      code: invalid_value
+                invalid_value_image:
+                  summary: A frame image that cannot be used
+                  value:
+                    error:
+                      message: '`image` is larger than 10 MB.'
+                      type: devup_error
+                      code: invalid_value
+                unsupported_parameter:
+                  summary: A video option the model does not list
+                  value:
+                    error:
+                      message: 'This model does not take `fps`.'
+                      type: devup_error
+                      code: unsupported_parameter
+                unsupported_content:
+                  summary: A frame image on a model that does not list it
+                  value:
+                    error:
+                      message: 'This model does not take `last_frame_image`.'
+                      type: devup_error
+                      code: unsupported_content
+                missing_required_parameter:
+                  summary: A model that needs a first frame, without one
+                  value:
+                    error:
+                      message: 'This model needs `image` (the first frame).'
+                      type: devup_error
+                      code: missing_required_parameter
         '401':
           $ref: '#/components/responses/Unauthorized'
         '402':
@@ -2575,8 +2637,8 @@ components:
             type: string
           description: >
             Informational notices about how the request was handled. Returned by chat
-            completions and Responses without streaming, only when there is at least
-            one.
+            completions and Responses without streaming, and by video generation,
+            only when there is at least one.
         note:
           type: string
           description: >
@@ -3796,6 +3858,22 @@ components:
     VideoGenerationRequest:
       type: object
       required: [model, prompt]
+      description: >
+        Models offer different options. Each model lists its options, and the
+        values it accepts, on its model page. The rules below apply to models
+        that list options; a model that lists none generates the video from
+        `prompt` and, where it offers several, `resolution`. An option left out
+        takes the model's default value. On models that list options, an option
+        the model does not list returns HTTP 400 `unsupported_parameter`
+        (`unsupported_content` for `image` and `last_frame_image`); `seed`,
+        `negative_prompt`, `num_frames` and parameters this schema does not
+        define are answered without them, with the notice
+        `parameter_not_supported`. A value or combination the model does not
+        accept returns HTTP 400 `invalid_value`, and the message names what the
+        model accepts. When a parameter and one of its aliases are both sent,
+        the parameter applies, with the notice `parameter_superseded`; two
+        aliases with different values return HTTP 400 `invalid_value`. The
+        request body can be at most 10 MiB (10,485,760 bytes), images included.
       properties:
         model:
           type: string
@@ -3805,19 +3883,81 @@ components:
           description: Text description of the desired video.
         negative_prompt:
           type: string
-          description: Text description of what to avoid.
+          description: >
+            What to keep out of the video, up to the length the model lists on
+            its model page. Used only when sent.
         num_frames:
           type: integer
-          description: Number of frames to generate.
+          deprecated: true
+          description: Deprecated. Use `duration`.
         width:
           type: integer
-          description: Video width in pixels.
+          minimum: 1
+          description: >
+            Output width in pixels. Send it together with `height`: the pair
+            selects the output size, as `size` does, on models whose outputs have
+            exact sizes. When `size` is also sent, `size` applies.
         height:
           type: integer
-          description: Video height in pixels.
+          minimum: 1
+          description: >
+            Output height in pixels. Send it together with `width`; see `width`.
         seed:
           type: integer
-          description: Random seed for reproducibility.
+          description: >
+            Seed for repeatable results, inside the range the model lists on its
+            model page. Used only when sent.
+        duration:
+          type: integer
+          minimum: 1
+          example: 8
+          description: >
+            Length of the video, in seconds. Alias: `seconds`. Each model lists
+            the values it accepts on its model page.
+        aspect_ratio:
+          type: string
+          pattern: '^[0-9]{1,2}:[0-9]{1,2}$'
+          example: '16:9'
+          description: >
+            Aspect ratio as `W:H`. On some models it works together with
+            `resolution` to select the output size. Each model lists the values
+            it accepts on its model page.
+        size:
+          type: string
+          pattern: '^[1-9][0-9]{0,4}x[1-9][0-9]{0,4}$'
+          example: '1280x720'
+          description: >
+            Exact output size as `WIDTHxHEIGHT`, on models whose outputs have
+            exact sizes; it selects the matching resolution and aspect ratio.
+            Alias: `width` and `height`, sent together. A size the model does not
+            offer returns HTTP 400 `invalid_value`, and the message lists the
+            sizes it offers.
+        generate_audio:
+          type: boolean
+          description: >
+            Whether the video has an audio track. Alias: `audio`. Each model lists
+            the values it accepts on its model page.
+        fps:
+          type: integer
+          minimum: 1
+          example: 24
+          description: >
+            Frame rate, in frames per second. Alias: `frame_rate`. Each model
+            lists the values it accepts on its model page.
+        camera_motion:
+          type: string
+          description: >
+            A camera movement. Each model lists the values it accepts on its
+            model page.
+        image:
+          $ref: '#/components/schemas/VideoFrameImage'
+        last_frame_image:
+          allOf:
+            - $ref: '#/components/schemas/VideoFrameImage'
+          description: >
+            The last frame of the video, in the same forms as `image`, on models
+            that list `last_frame_image`. Aliases: `last_frame`, `end_image_url`,
+            `tail_image_url`.
         resolution:
           type: string
           example: '1080p'
@@ -3838,6 +3978,92 @@ components:
             `data[0].b64_json`. A video larger than the inline size limit is
             returned in `data[0].url`, and `_devup.note` says so. Any other value
             returns HTTP 400 `invalid_response_format`.
+
+    VideoFrameImage:
+      description: >
+        The first frame of the video, on models that list `image`. A publicly
+        reachable HTTPS URL on the standard port, or a data URI
+        (`data:image/png;base64,...`, `data:image/jpeg;base64,...` or
+        `data:image/webp;base64,...`), as a string or as `{"image_url": "..."}`.
+        PNG, JPEG or WebP, at most 10 MB and at most 4096 pixels on a side; the
+        type is read from the image itself. Images are kept only for the request
+        and deleted within 30 minutes. An image that cannot be used returns HTTP
+        400 `invalid_value`; a model that needs a first frame returns HTTP 400
+        `missing_required_parameter` when it is missing. Aliases:
+        `first_frame_image`, `image_url`, `input_reference`.
+      oneOf:
+        - type: string
+          example: https://example.com/first-frame.png
+        - type: object
+          required: [image_url]
+          properties:
+            image_url:
+              type: string
+              description: An HTTPS URL or a data URI.
+
+    VideoGenerationFormRequest:
+      type: object
+      required: [model, prompt]
+      description: >
+        A video generation request as `multipart/form-data`, to send the first
+        or last frame as a file. The fields are those of
+        `VideoGenerationRequest`; whole numbers and booleans are sent as text
+        (`8`, `true`).
+      properties:
+        model:
+          type: string
+          description: Video generation model identifier.
+        prompt:
+          type: string
+          description: Text description of the desired video.
+        image:
+          type: string
+          format: binary
+          description: >
+            The first frame, as a PNG, JPEG or WebP file, at most 10 MB and at
+            most 4096 pixels on a side, on models that list `image`. The field
+            can also carry an `https://` URL or a data URI as text.
+        last_frame_image:
+          type: string
+          format: binary
+          description: >
+            The last frame, in the same form as `image`, on models that list
+            `last_frame_image`. The field can also carry an `https://` URL or a
+            data URI as text.
+        duration:
+          type: integer
+          minimum: 1
+          description: Length of the video, in seconds. See `VideoGenerationRequest`.
+        aspect_ratio:
+          type: string
+          description: Aspect ratio as `W:H`. See `VideoGenerationRequest`.
+        size:
+          type: string
+          description: Exact output size as `WIDTHxHEIGHT`. See `VideoGenerationRequest`.
+        generate_audio:
+          type: boolean
+          description: Whether the video has an audio track. See `VideoGenerationRequest`.
+        fps:
+          type: integer
+          minimum: 1
+          description: Frame rate, in frames per second. See `VideoGenerationRequest`.
+        camera_motion:
+          type: string
+          description: A camera movement. See `VideoGenerationRequest`.
+        seed:
+          type: integer
+          description: Seed for repeatable results. See `VideoGenerationRequest`.
+        negative_prompt:
+          type: string
+          description: What to keep out of the video. See `VideoGenerationRequest`.
+        resolution:
+          type: string
+          description: The output resolution of the video. See `VideoGenerationRequest`.
+        response_format:
+          type: string
+          enum: [url, b64_json]
+          default: url
+          description: How the video is returned. See `VideoGenerationRequest`.
 
     VideoEditRequest:
       type: object
