@@ -1158,7 +1158,7 @@ export interface components {
              */
             response_format?: "url" | "b64_json";
         };
-        /** @description The first frame of the video, on models that list `image`. A publicly reachable HTTPS URL on the standard port, or a data URI (`data:image/png;base64,...`, `data:image/jpeg;base64,...` or `data:image/webp;base64,...`), as a string or as `{"image_url": "..."}`. PNG, JPEG or WebP, at most 10 MB and at most 4096 pixels on a side; the type is read from the image itself. Images are kept only for the request and deleted within 30 minutes. An image that cannot be used returns HTTP 400 `invalid_value`; a model that needs a first frame returns HTTP 400 `missing_required_parameter` when it is missing. Aliases: `first_frame_image`, `image_url`, `input_reference`. */
+        /** @description The first frame of the video, on models that list `image`. A publicly reachable HTTPS URL on the standard port, or a data URI (`data:image/png;base64,...`, `data:image/jpeg;base64,...` or `data:image/webp;base64,...`), as a string or as `{"image_url": "..."}`. PNG, JPEG or WebP, at most 10 MB and at most 4096 pixels on a side; the type is read from the image itself. Some models take only some of these types; the error message then names the types the model takes, for example "`image` must be PNG or JPEG on this model.". Images are kept only for the request and deleted within 30 minutes. An image that cannot be used returns HTTP 400 `invalid_value`; a model that needs a first frame returns HTTP 400 `missing_required_parameter` when it is missing. Aliases: `first_frame_image`, `image_url`, `input_reference`. */
         VideoFrameImage: string | {
             /** @description An HTTPS URL or a data URI. */
             image_url: string;
@@ -1171,12 +1171,12 @@ export interface components {
             prompt: string;
             /**
              * Format: binary
-             * @description The first frame, as a PNG, JPEG or WebP file, at most 10 MB and at most 4096 pixels on a side, on models that list `image`. The field can also carry an `https://` URL or a data URI as text.
+             * @description The first frame, as a PNG, JPEG or WebP file, at most 10 MB and at most 4096 pixels on a side, on models that list `image`. Some models take only some of these types; the error message then names them. The field can also carry an `https://` URL or a data URI as text.
              */
             image?: string;
             /**
              * Format: binary
-             * @description The last frame, in the same form as `image`, on models that list `last_frame_image`. The field can also carry an `https://` URL or a data URI as text.
+             * @description The last frame, in the same form as `image`, on models that list `last_frame_image`. Some models take only some image types; the error message then names them. The field can also carry an `https://` URL or a data URI as text.
              */
             last_frame_image?: string;
             /** @description Length of the video, in seconds. See `VideoGenerationRequest`. */
