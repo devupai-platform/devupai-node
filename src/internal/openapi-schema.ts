@@ -175,7 +175,7 @@ export interface paths {
         put?: never;
         /**
          * Generate a video from a text prompt
-         * @description Creates a video from a text prompt or edits an existing video. Supports both JSON and multipart/form-data for video editing workflows. Returns a URL to the generated video. On models that list them, video options (duration, aspect ratio, audio, a first or last frame image, and more) are set by the fields of `VideoGenerationRequest`; multipart/form-data also carries the frame images as files.
+         * @description Creates a video from a text prompt or edits an existing video. Supports both JSON and multipart/form-data for video editing workflows. Returns a URL to the generated video. On models that list them, video options (duration, aspect ratio, audio, a first or last frame image, and more) are set by the fields of `VideoGenerationRequest`; multipart/form-data also carries the frame images as files. On models that list them, reference images, videos and audio files guide the video, and voice options choose the voice. The request body can be up to 10,485,760 bytes (10 MiB), files and data URIs included; a larger body returns HTTP 413 `payload_too_large`.
          */
         post: operations["createVideoGeneration"];
         delete?: never;
@@ -1100,11 +1100,11 @@ export interface components {
             })[];
             _devup: components["schemas"]["DevUpBilling"];
         };
-        /** @description Models offer different options. Each model lists its options, and the values it accepts, on its model page. The rules below apply to models that list options; a model that lists none generates the video from `prompt` and, where it offers several, `resolution`. An option left out takes the model's default value. On models that list options, an option the model does not list returns HTTP 400 `unsupported_parameter` (`unsupported_content` for `image` and `last_frame_image`); `seed`, `negative_prompt`, `num_frames` and parameters this schema does not define are answered without them, with the notice `parameter_not_supported`. A value or combination the model does not accept returns HTTP 400 `invalid_value`, and the message names what the model accepts. When a parameter and one of its aliases are both sent, the parameter applies, with the notice `parameter_superseded`; two aliases with different values return HTTP 400 `invalid_value`. The request body can be at most 10 MiB (10,485,760 bytes), images included. */
+        /** @description Models offer different options. Each model lists its options, and the values it accepts, on its model page. The rules below apply to models that list options; a model that lists none generates the video from `prompt` and, where it offers several, `resolution`. An option left out takes the model's default value. On models that list options, an option the model does not list returns HTTP 400 `unsupported_parameter` (`unsupported_content` for `image` and `last_frame_image`); `seed`, `negative_prompt`, `num_frames` and parameters this schema does not define are answered without them, with the notice `parameter_not_supported`. A value or combination the model does not accept returns HTTP 400 `invalid_value`, and the message names what the model accepts. When a parameter and one of its aliases are both sent, the parameter applies, with the notice `parameter_superseded`; two aliases with different values return HTTP 400 `invalid_value`. The request body can be at most 10,485,760 bytes (10 MiB), images, reference files and data URIs included; a larger body returns HTTP 413 `payload_too_large` and is not charged. For large files, send a URL. On models that list them, `reference_images`, `reference_videos` and `reference_audios` guide the video; references are numbered per kind in the order you send them, starting at 1, so a prompt can say image 1 or video 2 on models that read it that way. On a model that lists references or voice options, a kind of reference it does not list returns HTTP 400 `unsupported_content`, and a voice option it does not list returns HTTP 400 `unsupported_parameter`; on other models that list options, these parameters are answered without them, with the notice `parameter_not_supported`. On models that speak your text, such as avatar models, `prompt` is the script the avatar speaks. */
         VideoGenerationRequest: {
             /** @description Video generation model identifier. */
             model: string;
-            /** @description Text description of the desired video. */
+            /** @description Text description of the desired video. On models that speak your text, such as avatar models, `prompt` is the script the avatar speaks. Some models take a shorter prompt; the model page lists the limit, and a longer prompt returns HTTP 400 `invalid_value`. */
             prompt: string;
             /** @description What to keep out of the video, up to the length the model lists on its model page. Used only when sent. */
             negative_prompt?: string;
@@ -1146,6 +1146,18 @@ export interface components {
             image?: components["schemas"]["VideoFrameImage"];
             /** @description The last frame of the video, in the same forms as `image`, on models that list `last_frame_image`. Aliases: `last_frame`, `end_image_url`, `tail_image_url`. */
             last_frame_image?: components["schemas"]["VideoFrameImage"];
+            /** @description Images that guide the video, such as a person or a product, on models that list them: a list of items, or a single item read as a list of one. PNG, JPEG or WebP, at most 10 MB and at most 4096 pixels on a side each. How many items, and the types the model takes, are listed on its model page. Inside an item, `image_url` is the item's URL; at the top level, `image_url` stays an alias of `image`. Items are numbered from 1 in the order sent, for prompts; error messages count them from 0 (`reference_images[0]`). */
+            reference_images?: components["schemas"]["VideoReferenceImage"][] | components["schemas"]["VideoReferenceImage"];
+            /** @description Videos that guide the video, such as a motion or a scene, on models that list them: a list of items, or a single item read as a list of one. MP4 or MOV, at most 25 MB, 30 seconds and 4096 pixels on a side each. How many items, their lengths and the types the model takes are listed on its model page. */
+            reference_videos?: components["schemas"]["VideoReferenceVideo"][] | components["schemas"]["VideoReferenceVideo"];
+            /** @description Audio files that guide the video, such as a sound or a piece of music, on models that list them: a list of items, or a single item read as a list of one. WAV or MP3, at most 15 MB and 1 minute each. How many items, their lengths and the types the model takes are listed on its model page. */
+            reference_audios?: components["schemas"]["VideoReferenceAudio"][] | components["schemas"]["VideoReferenceAudio"];
+            /** @description A voice, on models that list voices. Alias: `voice_id`. Each model lists the values it accepts on its model page; when omitted, the model's default voice is used. */
+            voice?: string;
+            /** @description The language of the voice, on models that list it. Each model lists the values it accepts on its model page; when omitted, the model's default is used. */
+            voice_language?: string;
+            /** @description How the voice speaks, as free text, on models that list it, up to the length the model lists on its model page. Used only when sent. */
+            voice_instructions?: string;
             /**
              * @description The output resolution of the video, for models that offer several. Each model lists the values it accepts on its model page; values are case-insensitive. When omitted, the model's default resolution is used. A value the model does not offer returns HTTP 400 `invalid_value`, and the message lists the accepted values. The price depends on the resolution; see the model page.
              * @example 1080p
@@ -1163,7 +1175,37 @@ export interface components {
             /** @description An HTTPS URL or a data URI. */
             image_url: string;
         };
-        /** @description A video generation request as `multipart/form-data`, to send the first or last frame as a file. The fields are those of `VideoGenerationRequest`; whole numbers and booleans are sent as text (`8`, `true`). */
+        /** @description A reference image: a publicly reachable HTTPS URL on the standard port or a data URI (`data:image/png;base64,...`, `data:image/jpeg;base64,...` or `data:image/webp;base64,...`), as a string, as `{"url": "..."}` or as `{"image_url": "..."}`; send one of the two keys, not both. The type is read from the image itself. On models that list it, the object can also carry `voice_audio`. The reference files of one request can be at most 50 MB together, and they are kept only for the request and deleted within 30 minutes. Some models take less for the files of one request together; the error message then names the limit. A reference that cannot be used returns HTTP 400 `invalid_value`, and the message names the item and what the model takes. */
+        VideoReferenceImage: string | {
+            /** @description An HTTPS URL or a data URI. */
+            url: string;
+            voice_audio?: components["schemas"]["VideoReferenceVoiceAudio"];
+        } | {
+            /** @description An HTTPS URL or a data URI. */
+            image_url: string;
+            voice_audio?: components["schemas"]["VideoReferenceVoiceAudio"];
+        };
+        /** @description A reference video: a publicly reachable HTTPS URL on the standard port or a data URI (`data:video/mp4;base64,...` or `data:video/quicktime;base64,...`), as a string, as `{"url": "..."}` or as `{"video_url": "..."}`; send one of the two keys, not both. The type is read from the file itself. Some models take reference videos of at most 10 MB each; the error message then names the limit. For large files, send a URL. On models that list it, the object can also carry `voice_audio`. Reference files are kept only for the request and deleted within 30 minutes. */
+        VideoReferenceVideo: string | {
+            /** @description An HTTPS URL or a data URI. */
+            url: string;
+            voice_audio?: components["schemas"]["VideoReferenceVoiceAudio"];
+        } | {
+            /** @description An HTTPS URL or a data URI. */
+            video_url: string;
+            voice_audio?: components["schemas"]["VideoReferenceVoiceAudio"];
+        };
+        /** @description A reference audio file: a publicly reachable HTTPS URL on the standard port or a data URI (`data:audio/wav;base64,...` or `data:audio/mpeg;base64,...`), as a string, as `{"url": "..."}` or as `{"audio_url": "..."}`; send one of the two keys, not both. The type is read from the file itself. Some models take reference audio files of at most 10 MB each; the error message then names the limit. For large files, send a URL. Reference files are kept only for the request and deleted within 30 minutes. */
+        VideoReferenceAudio: string | {
+            /** @description An HTTPS URL or a data URI. */
+            url: string;
+        } | {
+            /** @description An HTTPS URL or a data URI. */
+            audio_url: string;
+        };
+        /** @description The voice of the person in this image or video, on models that list voice references: an audio file as an HTTPS URL or a data URI. It is a WAV or MP3 file, up to 15 MB and 1 minute. Some models take less; the message names the limit. JSON only; a `multipart/form-data` part cannot carry it. */
+        VideoReferenceVoiceAudio: string;
+        /** @description A video generation request as `multipart/form-data`, to send the first or last frame, or reference files, as files. The fields are those of `VideoGenerationRequest`; whole numbers and booleans are sent as text (`8`, `true`). Reference fields are repeated once per file, in the order the prompt numbers them. */
         VideoGenerationFormRequest: {
             /** @description Video generation model identifier. */
             model: string;
@@ -1179,6 +1221,18 @@ export interface components {
              * @description The last frame, in the same form as `image`, on models that list `last_frame_image`. Some models take only some image types; the error message then names them. The field can also carry an `https://` URL or a data URI as text.
              */
             last_frame_image?: string;
+            /** @description Reference images, as PNG, JPEG or WebP files, on models that list them. Repeat the field once per file; `reference_images[]` is also accepted, but not both names in one request. A part can also carry an `https://` URL or a data URI as text. See `VideoGenerationRequest`. */
+            reference_images?: string[];
+            /** @description Reference videos, as MP4 or MOV files, on models that list them. Repeat the field once per file; `reference_videos[]` is also accepted, but not both names in one request. A part can also carry an `https://` URL or a data URI as text. See `VideoGenerationRequest`. */
+            reference_videos?: string[];
+            /** @description Reference audio files, as WAV or MP3 files, on models that list them. Repeat the field once per file; `reference_audios[]` is also accepted, but not both names in one request. A part can also carry an `https://` URL or a data URI as text. See `VideoGenerationRequest`. */
+            reference_audios?: string[];
+            /** @description A voice. Alias `voice_id`. See `VideoGenerationRequest`. */
+            voice?: string;
+            /** @description The language of the voice. See `VideoGenerationRequest`. */
+            voice_language?: string;
+            /** @description How the voice speaks. See `VideoGenerationRequest`. */
+            voice_instructions?: string;
             /** @description Length of the video, in seconds. See `VideoGenerationRequest`. */
             duration?: number;
             /** @description Aspect ratio as `W:H`. See `VideoGenerationRequest`. */
@@ -2429,6 +2483,26 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            /** @description The request body is larger than 10,485,760 bytes (10 MiB). Files and Base64-encoded file data count toward this limit; for large files, send a URL. The body is not processed and the request is not charged. */
+            413: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "message": "The request body exceeds the limit of 10,485,760 bytes (10 MiB). Base64-encoded file data counts toward this limit.",
+                     *         "type": "devup_error",
+                     *         "code": "payload_too_large"
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             415: components["responses"]["UnprocessableRequest"];
             422: components["responses"]["UnprocessableRequest"];
             /** @description Too many requests. `error.code` is `rate_limit_exceeded` (your account's per-minute limit; the standard rate-limit headers are sent) or `model_at_capacity` (the model is momentarily at capacity; the response carries `Retry-After: 5` and `retry-after-ms: 5000`, and no rate-limit headers). Wait the number of seconds in `Retry-After` before retrying. */
