@@ -95,9 +95,29 @@ export interface paths {
         put?: never;
         /**
          * Generate images from a text prompt
-         * @description Creates one or more images from a text prompt. Supports JSON and multipart/form-data request bodies. Returns a temporary download link. The file is deleted automatically after a short period.
+         * @description Creates one or more images from a text prompt. Supports JSON and multipart/form-data request bodies. Returns a temporary download link. The file is deleted automatically after a short period. On models that list them, image options (size, quality, complexity, background, output format and compression, number of images, and more) are set by the fields of `ImageGenerationRequest`; each model lists its options and the values it accepts on its model page. To edit images, use `POST /v1/images/edits`. `stream: true` returns HTTP 400 `unsupported_parameter`. The request body can be up to 10,485,760 bytes (10 MiB), files and data URIs included; a larger body returns HTTP 413 `payload_too_large`.
          */
         post: operations["createImageGeneration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/images/edits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Edit images with a text prompt
+         * @description Edits one or more images as the prompt describes, on models that list edits. Supports JSON and multipart/form-data request bodies. The input images are sent in `image` (multipart: one `image` part per image, or `image[]`; JSON: `images` as a list of `{"image_url": ...}` objects or strings, or `image` as one item or a list), as HTTPS URLs, data URIs or files; `mask` and `markup` (not both) on models that list them. Up to 16 images per request, or fewer when the model lists fewer. Images can be PNG, JPEG or WebP, at most 10 MB each and at most 4096 pixels on a side, and at most 50 MB together. File ids are not supported. The image options of `POST /v1/images/generations` apply, as the model lists them. The request body can be up to 10,485,760 bytes (10 MiB), files and data URIs included; a larger body returns HTTP 413 `payload_too_large`.
+         */
+        post: operations["createImageEdit"];
         delete?: never;
         options?: never;
         head?: never;
@@ -381,9 +401,9 @@ export interface components {
              * @description Remaining account balance in Algerian Dinar after this request.
              */
             balance_dzd?: number;
-            /** @description Equal to the `x-request-id` response header. Returned by chat completions, Responses, embeddings, rerank, image generation, speech, transcription, inference and video. */
+            /** @description Equal to the `x-request-id` response header. Returned by chat completions, Responses, embeddings, rerank, image generation, image edits, speech, transcription, inference and video. */
             request_id?: string;
-            /** @description Informational notices about how the request was handled. Returned by chat completions and Responses without streaming, and by video generation, only when there is at least one. */
+            /** @description Informational notices about how the request was handled. Returned by chat completions and Responses without streaming, by video generation, and by image generation and image edits on models that list image options, only when there is at least one. */
             warnings?: string[];
             /** @description `POST /v1/video/generations` only: present when `response_format` is `b64_json` and the video is larger than the size returned inline. The video is then returned as a URL in `data[].url`, and this note says so. */
             note?: string;
@@ -934,6 +954,12 @@ export interface components {
         /**
          * @description Request schema for image editing via `multipart/form-data`.
          *     Additional multipart fields may be accepted, depending on the model.
+         *     Send it to `POST /v1/images/edits`. On models that list image options,
+         *     the option fields of `ImageGenerationRequest` are sent as text fields
+         *     (whole numbers as decimal text, for example `2`), and the rules of
+         *     `ImageGenerationRequest` apply. On models that list no image options, a
+         *     multipart request to `POST /v1/images/generations` keeps working as
+         *     before.
          */
         ImageEditRequest: {
             /** @description Image generation model identifier. */
@@ -942,16 +968,21 @@ export interface components {
             prompt?: string;
             /**
              * Format: binary
-             * @description Base image to edit.
+             * @description Base image to edit. To send several images, repeat the part once per image, or name the parts `image[]`; the first image is the one a mask or markup applies to. A part can also carry an HTTPS URL or a data URI as text. PNG, JPEG or WebP. Each model lists how many images it takes on its model page.
              */
             image?: string;
             /**
              * Format: binary
-             * @description Optional mask for inpainting.
+             * @description Optional mask for inpainting. On models that list it: a PNG with an alpha channel, the same width and height as the first image. Its transparent areas mark the part of the image to edit. Not with `markup`.
              */
             mask?: string;
             /**
-             * @description Image dimensions (e.g., `1024x1024`, `512x512`).
+             * Format: binary
+             * @description On models that list it: a transparent PNG, the same width and height as the first image, with marks drawn over it that show the edit. Not with `mask`.
+             */
+            markup?: string;
+            /**
+             * @description Image dimensions (e.g., `1024x1024`, `512x512`). On models that list image options, one of the sizes the model lists on its model page; see `ImageGenerationRequest.size`.
              * @default 1024x1024
              */
             size?: string;
@@ -960,42 +991,113 @@ export interface components {
              * @default 1
              */
             n?: number;
+            /** @description Image width in pixels. Send it together with `height`, as an alternative to `size`. */
+            width?: number;
+            /** @description Image height in pixels. Send it together with `width`, as an alternative to `size`. */
+            height?: number;
+            /** @description See `ImageGenerationRequest.quality`. */
+            quality?: string;
+            /** @description See `ImageGenerationRequest.complexity`. */
+            complexity?: string;
+            /** @description See `ImageGenerationRequest.background`. */
+            background?: string;
+            /** @description See `ImageGenerationRequest.output_format`. */
+            output_format?: string;
+            /** @description See `ImageGenerationRequest.output_compression`. */
+            output_compression?: number;
+            /** @description See `ImageGenerationRequest.num_inference_steps`. Alias `steps`. */
+            num_inference_steps?: number;
+            /** @description See `ImageGenerationRequest.guidance_scale`. Alias `guidance`. */
+            guidance_scale?: number;
+            /** @description See `ImageGenerationRequest.seed`. */
+            seed?: number;
+            /** @description See `ImageGenerationRequest.negative_prompt`. */
+            negative_prompt?: string;
+            /** @description See `ImageGenerationRequest.aspect_ratio`. */
+            aspect_ratio?: string;
             /**
-             * @description How the images are returned: `url` returns a temporary link in `data[].url`; `b64_json` returns the image bytes base64-encoded in `data[].b64_json`, and no file is stored. Any other value returns HTTP 400 `invalid_response_format`.
+             * @description How the images are returned: `url` returns a temporary link in `data[].url`; `b64_json` returns the image bytes base64-encoded in `data[].b64_json`, and no file is stored. Any other value returns HTTP 400 `invalid_response_format`. To receive the image bytes in the response, send `b64_json`.
              * @default url
              * @enum {string}
              */
             response_format?: "url" | "b64_json";
         };
+        /** @description JSON request of `POST /v1/images/edits`: the fields of `ImageGenerationRequest`, plus the input images. Each image is an HTTPS URL or a data URI (`data:image/png;base64,...`, `image/jpeg` or `image/webp`), as a string or as `{"image_url": ...}`. File ids are not supported and return HTTP 400 `unsupported_content`. Up to 16 images per request, or fewer when the model lists fewer; PNG, JPEG or WebP, at most 10 MB each and at most 4096 pixels on a side, and at most 50 MB together. On a model that does not list an input, sending it returns HTTP 400 `unsupported_content`; a model that needs `image` returns HTTP 400 `missing_required_parameter` without it. */
+        ImageEditJsonRequest: components["schemas"]["ImageGenerationRequest"] & {
+            /** @description The images to edit, in order; the first image is the one a mask or markup applies to. Alias of `image`; when both are sent, `image` applies, with the notice `parameter_superseded`. */
+            images?: (string | components["schemas"]["ImageInputUrl"])[];
+            /** @description The images to edit: one image, or a list of images in order. */
+            image?: string | components["schemas"]["ImageInputUrl"] | (string | components["schemas"]["ImageInputUrl"])[];
+            /** @description On models that list it: a PNG with an alpha channel, the same width and height as the first image. Its transparent areas mark the part of the image to edit. Not with `markup`. */
+            mask?: string | components["schemas"]["ImageInputUrl"];
+            /** @description On models that list it: a transparent PNG, the same width and height as the first image, with marks drawn over it that show the edit. Not with `mask`. */
+            markup?: string | components["schemas"]["ImageInputUrl"];
+        };
+        /** @description One input image of an edit request. */
+        ImageInputUrl: {
+            /** @description An HTTPS URL or a data URI of a PNG, JPEG or WebP image. */
+            image_url: string;
+        };
+        /** @description Models offer different image options. Each model lists its options, and the values it accepts, on its model page. The rules below apply to models that list options; a model that lists none takes `prompt`, `size` (or `width` and `height`), `n` and `response_format` as before. An option left out takes the model's default value, and the image is generated with it. On models that list options, an option that changes the image and that the model does not list (`size`, `quality`, `complexity`, `background`, `output_format`, `output_compression`, `aspect_ratio`) returns HTTP 400 `unsupported_parameter`; `seed`, `num_inference_steps`, `guidance_scale`, `negative_prompt`, `"auto"` for a `size` or `quality` the model does not list, and parameters this schema does not define are answered without them, with the notice `parameter_not_supported`. A value or combination the model does not accept returns HTTP 400 `invalid_value`, and the message names what the model accepts. On a model that lists `size` or `quality`, `"auto"` for it generates the image with the model's default value, with the notice `auto_value_applied`. When a parameter and one of its aliases are both sent, the parameter applies, with the notice `parameter_superseded`. `stream: true` returns HTTP 400 `unsupported_parameter` on every image model. */
         ImageGenerationRequest: {
             /** @description Image generation model identifier. */
             model: string;
             /** @description Text description of the desired image. */
             prompt: string;
-            /** @description Text description of what to avoid in the image. */
+            /** @description Text description of what to avoid in the image, up to the length the model lists on its model page. Used only when sent. */
             negative_prompt?: string;
             /**
-             * @description Image dimensions (e.g., `1024x1024`, `512x512`).
+             * @description Image dimensions (e.g., `1024x1024`, `512x512`), as `WIDTHxHEIGHT`. Each model lists its sizes on its model page; some models also take other sizes inside rules the model page lists, and a size outside them returns HTTP 400 `invalid_value` naming the rule. On models that list image options, a size left out takes the model's default size, and `auto` generates the image at that size.
              * @default 1024x1024
              */
             size?: string;
             /**
-             * @description Number of images to generate.
+             * @description Number of images to generate. On models that list image options, up to the number the model lists.
              * @default 1
              */
             n?: number;
-            /** @description Image width in pixels (alternative to `size`). */
+            /** @description Image width in pixels (alternative to `size`). Send it together with `height`; when `size` is also sent, `size` applies. */
             width?: number;
-            /** @description Image height in pixels (alternative to `size`). */
+            /** @description Image height in pixels (alternative to `size`). Send it together with `width`; see `width`. */
             height?: number;
-            /** @description Number of diffusion steps. */
+            /**
+             * @description Quality level, from the values the model lists on its model page, for example `low`, `medium` or `high`. `auto` generates the image at the model's default quality.
+             * @example medium
+             */
+            quality?: string;
+            /**
+             * @description Complexity level, from the values the model lists on its model page, for example `low`, `medium` or `high`.
+             * @example medium
+             */
+            complexity?: string;
+            /**
+             * @description `transparent`, `opaque` or `auto`, as the model lists. A transparent background needs `output_format` `png` or `webp`.
+             * @example transparent
+             */
+            background?: string;
+            /**
+             * @description File format of the image: `png`, `webp` or `jpeg`, as the model lists.
+             * @example png
+             */
+            output_format?: string;
+            /**
+             * @description Compression level of a `jpeg` or `webp` image, inside the range the model lists. Not available with `png`.
+             * @example 80
+             */
+            output_compression?: number;
+            /**
+             * @description Aspect ratio as `W:H`, from the values the model lists on its model page.
+             * @example 16:9
+             */
+            aspect_ratio?: string;
+            /** @description Number of diffusion steps, inside the range the model lists. Alias: `steps`. */
             num_inference_steps?: number;
-            /** @description Classifier-free guidance scale. */
+            /** @description Classifier-free guidance scale: how closely the image follows the prompt, inside the range the model lists. Alias: `guidance`. */
             guidance_scale?: number;
-            /** @description Random seed for reproducibility. */
+            /** @description Random seed for reproducibility, inside the range the model lists. Used only when sent. */
             seed?: number;
             /**
-             * @description How the images are returned: `url` returns a temporary link in `data[].url`; `b64_json` returns the image bytes base64-encoded in `data[].b64_json`, and no file is stored. Any other value returns HTTP 400 `invalid_response_format`.
+             * @description How the images are returned: `url` returns a temporary link in `data[].url`; `b64_json` returns the image bytes base64-encoded in `data[].b64_json`, and no file is stored. Any other value returns HTTP 400 `invalid_response_format`. To receive the image bytes in the response, send `b64_json`.
              * @default url
              * @enum {string}
              */
@@ -1011,6 +1113,37 @@ export interface components {
                 /** @description The image bytes, base64-encoded. */
                 b64_json?: string;
             } & (unknown | unknown))[];
+            /** @description When the response was created, in Unix seconds. On models that list image options. */
+            created?: number;
+            /** @description The size the images were generated at. On models that list a size option. */
+            size?: string;
+            /** @description The quality level the images were generated at. On models that list a quality option. */
+            quality?: string;
+            /** @description The file format of the images. On models that list an output format option. */
+            output_format?: string;
+            /** @description The background the images were generated with. On models that list a background option. */
+            background?: string;
+            /** @description The token counts of the request. On models that list image options and are priced by the tokens a request uses. */
+            usage?: {
+                /** @description Input tokens, text and images. */
+                input_tokens?: number;
+                input_tokens_details?: {
+                    /** @description Input tokens of the prompt. */
+                    text_tokens?: number;
+                    /** @description Input tokens of the input images. */
+                    image_tokens?: number;
+                };
+                /** @description Output tokens. */
+                output_tokens?: number;
+                output_tokens_details?: {
+                    /** @description Output tokens of the images. */
+                    image_tokens?: number;
+                    /** @description Output tokens of text. */
+                    text_tokens?: number;
+                };
+                /** @description Input and output tokens. */
+                total_tokens?: number;
+            };
             _devup: components["schemas"]["DevUpBilling"];
         };
         SpeechRequest: {
@@ -1517,6 +1650,26 @@ export interface components {
                  *         "message": "The \"model\" field is required.",
                  *         "type": "devup_error",
                  *         "code": "missing_model"
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description The request body of `POST /v1/images/generations` or `POST /v1/images/edits` is larger than 10,485,760 bytes (10 MiB). Files and Base64-encoded file data count toward this limit; for large images, send a URL. The body is not processed and the request is not charged. */
+        ImagePayloadTooLarge: {
+            headers: {
+                "x-request-id": components["headers"]["XRequestId"];
+                "x-client-request-id": components["headers"]["XClientRequestId"];
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": {
+                 *         "message": "The request body exceeds the limit of 10,485,760 bytes (10 MiB). Base64-encoded file data counts toward this limit.",
+                 *         "type": "devup_error",
+                 *         "code": "payload_too_large"
                  *       }
                  *     }
                  */
@@ -2096,14 +2249,6 @@ export interface operations {
         };
         requestBody: {
             content: {
-                /**
-                 * @example {
-                 *       "model": "stabilityai/stable-diffusion-xl-base-1.0",
-                 *       "prompt": "A futuristic city skyline at sunset",
-                 *       "size": "1024x1024",
-                 *       "n": 1
-                 *     }
-                 */
                 "application/json": components["schemas"]["ImageGenerationRequest"];
                 /**
                  * @example {
@@ -2123,6 +2268,7 @@ export interface operations {
                 headers: {
                     "x-request-id": components["headers"]["XRequestId"];
                     "x-client-request-id": components["headers"]["XClientRequestId"];
+                    "X-DEVUP-Warnings": components["headers"]["XDevupWarnings"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2157,6 +2303,84 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            413: components["responses"]["ImagePayloadTooLarge"];
+            415: components["responses"]["UnprocessableRequest"];
+            422: components["responses"]["UnprocessableRequest"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["RequestNotCompleted"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createImageEdit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageEditJsonRequest"];
+                /**
+                 * @example {
+                 *       "model": "openai/gpt-image-2.6-flare",
+                 *       "prompt": "Replace the sky with a starry night.",
+                 *       "image": "<binary data>",
+                 *       "mask": "<binary data>",
+                 *       "size": "1024x1024",
+                 *       "response_format": "b64_json"
+                 *     }
+                 */
+                "multipart/form-data": components["schemas"]["ImageEditRequest"];
+            };
+        };
+        responses: {
+            /** @description Image edited successfully. */
+            200: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    "X-DEVUP-Warnings": components["headers"]["XDevupWarnings"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": [
+                     *         {
+                     *           "b64_json": "<base64>"
+                     *         }
+                     *       ],
+                     *       "size": "1024x1024",
+                     *       "quality": "medium",
+                     *       "output_format": "png",
+                     *       "background": "auto",
+                     *       "_devup": {
+                     *         "request_id": "req_9fd8ddec5b2149539860a86dccba58cf"
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ImageGenerationResponse"];
+                };
+            };
+            /** @description Invalid request body or parameters. */
+            400: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            402: components["responses"]["InsufficientBalance"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["ImagePayloadTooLarge"];
             415: components["responses"]["UnprocessableRequest"];
             422: components["responses"]["UnprocessableRequest"];
             429: components["responses"]["RateLimited"];
