@@ -80,6 +80,7 @@ describe("OpenAPI Contract Tests (vendored openapi/devupai-v1.yaml)", () => {
             "/v1/embeddings",
             "/v1/rerank",
             "/v1/images/generations",
+            "/v1/images/edits",
             "/v1/images/proxy",
             "/v1/audio/speech",
             "/v1/audio/transcriptions",

@@ -1,6 +1,6 @@
 {
   "name": "devupai",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Official Node.js SDK for the DEVUP AI platform: an OpenAI-compatible API with DZD billing.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -81,7 +81,7 @@
   "devDependencies": {
     "@ai-sdk/openai-compatible": "^3.0.82",
     "@ai-sdk/provider": "^4.0.35",
-    "@types/node": "^20.0.0",
+    "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^8.66.0",
     "@typescript-eslint/parser": "^8.66.0",
     "ai": "^7.0.159",

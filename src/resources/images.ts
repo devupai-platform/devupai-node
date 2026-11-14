@@ -1,11 +1,61 @@
 import type { RequestOptions } from "../core/client";
 import type { APIPromise } from "../core/api-promise";
 import { DevupAPIError } from "../core/errors";
-import type { ImageEditParams, ImageGenerateParams, ImageGenerateResponse } from "../types";
-import { APIResource, appendField, mergeRequestOptions, prepareRequest, rejectedAPIPromise, toBlob } from "./shared";
+import type { ImageEditJsonParams, ImageEditParams, ImageGenerateParams, ImageGenerateResponse } from "../types";
+import {
+    APIResource,
+    appendField,
+    appendInput,
+    isBinaryInput,
+    isRecord,
+    mergeRequestOptions,
+    prepareRequest,
+    rejectedAPIPromise,
+    type BinaryInput,
+} from "./shared";
 
 /** Message of the error thrown by `images.download` for a URL it does not fetch. */
 const INVALID_FILE_URL_MESSAGE = "images.download only fetches URLs returned by the API.";
+
+/** The request fields of an image edit that carry input images (`images` is the list form of `image`). */
+const IMAGE_INPUT_FIELDS: ReadonlyArray<string> = ["image", "images", "mask", "markup"];
+
+/** The items of an input field: a list as is, one value as a list of one, nothing when unset. */
+function inputItems(value: unknown): unknown[] {
+    if (Array.isArray(value)) return value;
+    return value === undefined || value === null ? [] : [value];
+}
+
+/** One input item as a form part: a file, a text value (URL or data URI), or the `image_url` of an object. */
+function inputPart(item: unknown): BinaryInput | string | undefined {
+    if (typeof item === "string" || isBinaryInput(item)) return item;
+    if (isRecord(item) && typeof item.image_url === "string") return item.image_url;
+    return undefined;
+}
+
+/**
+ * Builds the `multipart/form-data` body of an image edit from the request fields: one `image`
+ * part per input image (`image` and `images`), one part each for `mask` and `markup`, and every
+ * other field as a text part (`undefined` and `null` left out). Every field of the body is sent,
+ * so a field added to the request shape reaches the form without a change here.
+ */
+function editForm(body: Record<string, unknown>): FormData {
+    const form = new FormData();
+    for (const [name, value] of Object.entries(body)) {
+        if (IMAGE_INPUT_FIELDS.includes(name)) {
+            const partName = name === "images" ? "image" : name;
+            for (const item of inputItems(value)) {
+                const part = inputPart(item);
+                if (part !== undefined) appendInput(form, partName, part);
+            }
+        } else if (typeof value === "object" && value !== null) {
+            form.append(name, JSON.stringify(value));
+        } else {
+            appendField(form, name, value as string | number | boolean | null | undefined);
+        }
+    }
+    return form;
+}
 
 /** Images resource: generation, editing, and fetching generated files. */
 export class Images extends APIResource {
@@ -32,38 +82,54 @@ export class Images extends APIResource {
     }
 
     /**
-     * Edits an image from a source image, an optional mask and a prompt
-     * (`POST /images/generations`, multipart form data).
+     * Edits one or more images as the prompt describes (`POST /images/edits`).
+     *
+     * The request takes one of two forms, chosen from the input images (`image`, `images`,
+     * `mask`, `markup`):
+     *
+     * - When every input is an HTTPS URL or a data URI (a string or `{ image_url }`), the
+     *   params are sent as JSON, exactly as given.
+     * - When at least one input is a file (`Blob`, `File` or `Uint8Array`), the params are
+     *   sent as `multipart/form-data`: one `image` part per input image, in order; one
+     *   `mask` and one `markup` part when given (a file, or a URL or data URI as text);
+     *   every other field as a text part.
      *
      * Request options can be passed as the second argument, or inside `params`; the
      * second argument wins.
      *
-     * @example
+     * @example JSON form: images given as URLs or data URIs
      * ```ts
      * const result = await client.images.edit({
      *     model: "<model-id>",
-     *     image: imageBlob,
+     *     prompt: "Replace the sky with a starry night",
+     *     images: ["https://example.com/photo.png"],
+     *     mask: { image_url: "https://example.com/mask.png" },
+     * });
+     * ```
+     *
+     * @example Multipart form: images given as files
+     * ```ts
+     * const result = await client.images.edit({
+     *     model: "<model-id>",
      *     prompt: "Add a hat",
+     *     image: [firstImageBlob, secondImageBlob],
+     *     mask: maskBlob,
      * });
      * ```
      */
-    edit(params: ImageEditParams & RequestOptions, options?: RequestOptions): APIPromise<ImageGenerateResponse> {
+    edit(params: ImageEditJsonParams & RequestOptions, options?: RequestOptions): APIPromise<ImageGenerateResponse>;
+    edit(params: ImageEditParams & RequestOptions, options?: RequestOptions): APIPromise<ImageGenerateResponse>;
+    edit(
+        params: (ImageEditJsonParams | ImageEditParams) & RequestOptions,
+        options?: RequestOptions,
+    ): APIPromise<ImageGenerateResponse> {
         const { body, options: requestOptions } = prepareRequest(params, options);
-        const form = new FormData();
-        form.append("image", toBlob(body.image));
-        if (body.mask !== undefined && body.mask !== null) {
-            form.append("mask", toBlob(body.mask));
-        }
-        appendField(form, "prompt", body.prompt);
-        appendField(form, "model", body.model);
-        appendField(form, "n", body.n);
-        appendField(form, "size", body.size);
-        appendField(form, "response_format", body.response_format);
-
+        const fields = body as Record<string, unknown>;
+        const hasFile = IMAGE_INPUT_FIELDS.some((name) => inputItems(fields[name]).some(isBinaryInput));
         return this._client.json<ImageGenerateResponse>({
             method: "POST",
-            path: "/images/generations",
-            body: form,
+            path: "/images/edits",
+            body: hasFile ? editForm(fields) : body,
             auth: true,
             options: requestOptions,
         });

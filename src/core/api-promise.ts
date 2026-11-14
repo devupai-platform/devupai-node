@@ -6,6 +6,8 @@ export interface WithResponse<T> {
     response: Response;
     /** Value of the `x-request-id` response header. */
     requestId: string | null;
+    /** Value of the `x-client-request-id` response header. */
+    clientRequestId: string | null;
     /** Informational notices from the `X-DEVUP-Warnings` response header. */
     warnings: string[];
 }

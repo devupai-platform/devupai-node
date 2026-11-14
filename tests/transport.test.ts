@@ -85,6 +85,8 @@ describe("APIPromise and withResponse() (D6, block0 §3.9 items 9, 10)", () => {
             ["video.edits.create", () => client.video.edits.create({ model: MODEL_A, video: blob })],
             ["inference.run", () => client.inference.run(MODEL_A, { input: "x" })],
             ["balance.retrieve", () => client.balance.retrieve()],
+            ["me.retrieve", () => client.me.retrieve()],
+            ["me.avatar", () => client.me.avatar()],
             ["health.check", () => client.health.check()],
         ];
         for (const [name, call] of calls) {

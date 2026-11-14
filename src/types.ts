@@ -154,12 +154,26 @@ export type ImageGenerateParams = Schemas["ImageGenerationRequest"];
 /** The response of an image generation or edit. */
 export type ImageGenerateResponse = Schemas["ImageGenerationResponse"];
 
-/** The fields of an image edit, sent as `multipart/form-data`. */
-export type ImageEditParams = Omit<Schemas["ImageEditRequest"], "image" | "mask"> & {
-    /** Base image to edit. */
-    image: BinaryInput;
+/** An input image given as an object: `{ image_url }`, where the value is an HTTPS URL or a data URI. */
+export type ImageInputUrl = Schemas["ImageInputUrl"];
+
+/**
+ * The fields of an image edit sent as JSON to `POST /v1/images/edits`: every input image
+ * (`images`, `image`, `mask`, `markup`) is an HTTPS URL or a data URI, as a string or as `{ image_url }`.
+ */
+export type ImageEditJsonParams = Schemas["ImageEditJsonRequest"];
+
+/** One input of a multipart image edit: a file, or an HTTPS URL or data URI as text. */
+export type ImageEditInput = BinaryInput | string;
+
+/** The fields of an image edit sent as `multipart/form-data` to `POST /v1/images/edits`. */
+export type ImageEditParams = Omit<Schemas["ImageEditRequest"], "image" | "mask" | "markup"> & {
+    /** The image to edit, or several images in order; the first is the one a mask or markup applies to. */
+    image?: ImageEditInput | ImageEditInput[];
     /** Optional mask for inpainting. */
-    mask?: BinaryInput;
+    mask?: ImageEditInput;
+    /** Optional markup drawn over the first image. */
+    markup?: ImageEditInput;
 };
 
 // ---------------------------------------------------------------------------
@@ -190,6 +204,47 @@ export type TranscriptionVerboseResponse = Schemas["TranscriptionVerboseResponse
 
 /** The request body of `POST /v1/video/generations`. */
 export type VideoGenerationCreateParams = Schemas["VideoGenerationRequest"];
+
+/** The first or last frame of a video: an HTTPS URL or a data URI, as a string or as `{ image_url }`. */
+export type VideoFrameImage = Schemas["VideoFrameImage"];
+
+/** A reference image of a video generation. */
+export type VideoReferenceImage = Schemas["VideoReferenceImage"];
+
+/** A reference video of a video generation. */
+export type VideoReferenceVideo = Schemas["VideoReferenceVideo"];
+
+/** A reference audio file of a video generation. */
+export type VideoReferenceAudio = Schemas["VideoReferenceAudio"];
+
+/** A voice audio sample attached to a reference item. */
+export type VideoReferenceVoiceAudio = Schemas["VideoReferenceVoiceAudio"];
+
+/** The fields of a video generation sent as `multipart/form-data`, as the API describes them. */
+export type VideoGenerationFormRequest = Schemas["VideoGenerationFormRequest"];
+
+/** One media input of a multipart video generation: a file, or an HTTPS URL or data URI as text. */
+export type VideoMediaInput = BinaryInput | string;
+
+/**
+ * The fields of a video generation sent as `multipart/form-data`: the frames and reference
+ * files are sent as files. A `reference_*` field takes one item or an array of items.
+ */
+export type VideoGenerationCreateFormParams = Omit<
+    VideoGenerationFormRequest,
+    "image" | "last_frame_image" | "reference_images" | "reference_videos" | "reference_audios"
+> & {
+    /** The first frame of the video. */
+    image?: VideoMediaInput;
+    /** The last frame of the video. */
+    last_frame_image?: VideoMediaInput;
+    /** Reference images, in order. */
+    reference_images?: VideoMediaInput | VideoMediaInput[];
+    /** Reference videos, in order. */
+    reference_videos?: VideoMediaInput | VideoMediaInput[];
+    /** Reference audio files, in order. */
+    reference_audios?: VideoMediaInput | VideoMediaInput[];
+};
 
 /** One key point of a video edit in `key_points` mode. */
 export type VideoKeyPoint = {
@@ -223,6 +278,12 @@ export type ModelListResponse = Schemas["ModelListResponse"];
 
 /** The response of `GET /v1/user/balance`. */
 export type BalanceResponse = Schemas["BalanceResponse"];
+
+/** The response of `GET /v1/me`: the profile of the account that owns the API key. */
+export type AccountProfile = Schemas["AccountProfile"];
+
+/** Where to fetch the account's profile picture (`GET /v1/me/avatar`), and its current `etag`. */
+export type AccountAvatar = Schemas["AccountAvatar"];
 
 /** The response of `GET /health`. */
 export type HealthResponse = Schemas["HealthResponse"];

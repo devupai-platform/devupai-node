@@ -123,6 +123,8 @@ export class Stream<T> implements AsyncIterable<T> {
     readonly response: Response;
     /** Value of the `x-request-id` response header. */
     readonly requestId: string | null;
+    /** Value of the `x-client-request-id` response header, or `null` when it is absent. */
+    readonly clientRequestId: string | null;
     /** Informational notices from the `X-DEVUP-Warnings` response header. */
     readonly warnings: string[];
 
@@ -135,6 +137,7 @@ export class Stream<T> implements AsyncIterable<T> {
     constructor(response: Response, config: StreamConfig, options: StreamOptions = {}) {
         this.response = response;
         this.requestId = response.headers.get("x-request-id");
+        this.clientRequestId = response.headers.get("x-client-request-id");
         this.warnings = parseWarnings(response.headers);
         this.#config = config;
         this.#options = options;

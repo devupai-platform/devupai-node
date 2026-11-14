@@ -52,6 +52,20 @@ export interface RequestOptions {
     streamIdleTimeout?: number;
 }
 
+/**
+ * Options of a `GET` request that can answer `304 Not Modified`
+ * (`models.list`, `models.retrieve`, `me.avatar`).
+ */
+export interface ConditionalRequestOptions extends RequestOptions {
+    /**
+     * An entity tag from a previous answer (its `ETag` header, quotes included); sent as
+     * `If-None-Match`. When it still matches, the API answers `304 Not Modified` without
+     * a body, and the method resolves with `null` (or with the 304 `Response` for a
+     * method that returns a `Response`) instead of throwing.
+     */
+    ifNoneMatch?: string;
+}
+
 /** The keys of {@link RequestOptions}. */
 export const REQUEST_OPTION_KEYS = ["signal", "timeout", "maxRetries", "headers", "streamIdleTimeout"] as const;
 
@@ -89,6 +103,12 @@ export interface APIRequest {
     body?: unknown;
     /** `true` sends `Authorization: Bearer <apiKey>`; `false` sends no `Authorization` header. */
     auth: boolean;
+    /**
+     * Sent as the `If-None-Match` header (it wins over one given in `options.headers`).
+     * When set, a `304 Not Modified` answer is a result, not an error: `json` resolves
+     * with `null` and `raw` with the 304 `Response`.
+     */
+    ifNoneMatch?: string;
     options?: RequestOptions;
 }
 
@@ -375,6 +395,19 @@ export class APIClient {
                     continue;
                 }
 
+                if (req.ifNoneMatch !== undefined && response.status === 304) {
+                    // Not Modified: the copy named by `If-None-Match` is still current. There is
+                    // no body to read, so the call ends here with `null` (or the `Response` itself).
+                    clearTimeout(timer);
+                    return {
+                        data: (kind === "raw" ? response : null) as R,
+                        response,
+                        requestId: response.headers.get("x-request-id"),
+                        clientRequestId: response.headers.get("x-client-request-id"),
+                        warnings: parseWarnings(response.headers),
+                    };
+                }
+
                 if (!response.ok) {
                     let text = "";
                     try {
@@ -404,6 +437,7 @@ export class APIClient {
                     data,
                     response,
                     requestId: response.headers.get("x-request-id"),
+                    clientRequestId: response.headers.get("x-client-request-id"),
                     warnings: parseWarnings(response.headers),
                 };
             }
@@ -489,6 +523,7 @@ export class APIClient {
         };
         mergeHeaders(headers, this.#headers);
         mergeHeaders(headers, req.options?.headers);
+        if (req.ifNoneMatch !== undefined) setHeader(headers, "If-None-Match", req.ifNoneMatch);
         deleteHeader(headers, "authorization");
         deleteHeader(headers, "content-type");
         if (req.auth) headers["Authorization"] = `Bearer ${this.apiKey}`;
@@ -501,7 +536,7 @@ export class APIClient {
         try {
             this.#onDebug?.(event);
         } catch {
-            // Deliberately ignored: `onDebug` is a diagnostic hook, and its errors must not
+            // Deliberately not propagated: `onDebug` is a diagnostic hook, and its errors must not
             // turn a successful request (or a retry) into a failure.
         }
     }

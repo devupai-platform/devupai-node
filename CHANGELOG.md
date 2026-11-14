@@ -1,12 +1,57 @@
 # Changelog
 
 All notable changes to the `devupai` package are listed here. Earlier 3.x
-entries are in [docs/v3/CHANGELOG_V3.md](./docs/v3/CHANGELOG_V3.md).
+entries are in [docs/v3/CHANGELOG_V3.md](https://github.com/devupai-platform/devupai-node/blob/main/docs/v3/CHANGELOG_V3.md).
+
+## [4.1.0]
+
+No breaking changes.
+
+### Added
+
+- `client.images.edit()` accepts a JSON form (`ImageEditJsonParams`): every
+  input image is an `https://` URL or a `data:` URI, as a string or as
+  `{ image_url }`. Several images are allowed in both forms (`images` or
+  `image`; the first is the one a `mask` or `markup` applies to), and `markup`
+  is a new optional input. The SDK sends JSON when no input is a file and
+  `multipart/form-data` when any input is a file.
+- Video generation with files: `client.video.generations.create()` sends
+  `multipart/form-data` when any of `image`, `last_frame_image`,
+  `reference_images`, `reference_videos`, or `reference_audios` is a file
+  (`VideoGenerationCreateFormParams`); with strings only it sends JSON as
+  before. New types `VideoGenerationFormRequest`, `VideoFrameImage`,
+  `VideoReferenceImage`, `VideoReferenceVideo`, `VideoReferenceAudio`,
+  `VideoReferenceVoiceAudio`, `VideoMediaInput`, and
+  `VideoGenerationCreateFormParams`.
+- `client.me.retrieve()` for `GET /v1/me` and `client.me.avatar()` for the
+  account picture, with an `ifNoneMatch` option. Types `AccountProfile` and
+  `AccountAvatar`.
+- `client.inference.run()` accepts a `FormData` payload, sent as
+  `multipart/form-data`, and the request option `responseType: "binary"`,
+  which resolves to the native `Response` with its body unread.
+- Transcriptions: `prompt`, `temperature`, and `timestamp_granularities`.
+- `clientRequestId` (the `x-client-request-id` header) on `withResponse()`,
+  on streams, and on `DevupAPIError`.
+- `ifNoneMatch` on `client.models.list()` and `client.models.retrieve(id)`:
+  the call resolves to `null` when the API answers 304 Not Modified, and
+  `withResponse()` gives the 304 response and its `ETag`.
+- Request and response types regenerated from the current API description:
+  image options, `/v1/images/edits`, video options, frames, and reference
+  media.
+
+### Fixed
+
+- `images.edit()` posts to `POST /v1/images/edits`, the endpoint the API
+  documents for edits, and sends every field its type allows. The request and
+  response shapes are unchanged.
+- The README examples for Next.js use the current `ai` 7 helpers.
+- The retry sentence lists 408.
+- The links to the migration guide and the 3.x changelog work on npmjs.com.
 
 ## [4.0.0]
 
 A major release. Upgrade steps, with before and after code, are in
-[MIGRATION_V3_TO_V4.md](./MIGRATION_V3_TO_V4.md).
+[MIGRATION_V3_TO_V4.md](https://github.com/devupai-platform/devupai-node/blob/main/MIGRATION_V3_TO_V4.md).
 
 ### Breaking changes
 
@@ -46,7 +91,7 @@ A major release. Upgrade steps, with before and after code, are in
   when the request sets `encoding_format: "base64"`).
 - **Every method returns an `APIPromise<T>`**, a `Promise` subclass. Code that
   awaits the result is unchanged.
-- **Default retries and timeout.** Transient errors (429, 502, 503, 504, network) are retried with backoff; set `maxRetries` to change it.
+- **Default retries and timeout.** Transient errors (408, 429, 502, 503, 504, network) are retried with backoff; set `maxRetries` to change it.
   The default `timeout` is 600000 ms (10 minutes) per call.
 - **Typed timeouts and aborts.** A timeout throws `APITimeoutError` instead of
   a raw `AbortError`. A call whose `signal` is already aborted rejects before a
@@ -65,7 +110,7 @@ A major release. Upgrade steps, with before and after code, are in
 
 - `message.content` can be `null` (for example on replies with tool calls);
   check it before use. Before and after code is in
-  [MIGRATION_V3_TO_V4.md](./MIGRATION_V3_TO_V4.md#15-messagecontent-can-be-null).
+  [MIGRATION_V3_TO_V4.md](https://github.com/devupai-platform/devupai-node/blob/main/MIGRATION_V3_TO_V4.md#15-messagecontent-can-be-null).
 
 ### Added
 

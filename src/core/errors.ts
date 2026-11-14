@@ -74,6 +74,8 @@ export class DevupAPIError extends Error {
     readonly param: string | null;
     /** Value of the `x-request-id` response header. */
     readonly requestId: string | null;
+    /** Value of the `x-client-request-id` response header. */
+    readonly clientRequestId: string | null;
     /** Raw value of the `Retry-After` response header. */
     readonly retryAfter: string | null;
     /** Wait requested by the API before a new attempt, in milliseconds. */
@@ -101,6 +103,7 @@ export class DevupAPIError extends Error {
         this.cause = cause;
         this.headers = headersToRecord(headers);
         this.requestId = this.headers["x-request-id"] || null;
+        this.clientRequestId = this.headers["x-client-request-id"] || null;
         this.retryAfter = this.headers["retry-after"] || null;
         this.retryAfterMs = headers ? parseRetryAfterMs(headers) : null;
         this.warnings = headers ? parseWarnings(headers) : [];

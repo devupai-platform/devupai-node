@@ -850,7 +850,7 @@ paths:
             schema:
               $ref: '#/components/schemas/ImageEditRequest'
             example:
-              model: stabilityai/stable-diffusion-xl-base-1.0
+              model: black-forest-labs/FLUX-1-schnell
               prompt: A futuristic city skyline at sunset
               image: <binary data>
               size: 1024x1024
@@ -891,7 +891,7 @@ paths:
                   summary: Missing model field
                   value:
                     error:
-                      message: 'The "model" field is required. Example: "stabilityai/stable-diffusion-xl-base-1.0"'
+                      message: 'The "model" field is required. Example: "black-forest-labs/FLUX-1-schnell"'
                       type: devup_error
                       code: missing_model
                 invalid_response_format:
@@ -901,6 +901,76 @@ paths:
                       message: "Invalid response_format. Accepted values are 'url' or 'b64_json'."
                       type: devup_error
                       code: invalid_response_format
+                invalid_request_body:
+                  summary: The request body is not valid JSON
+                  value:
+                    error:
+                      message: Request body must be valid JSON.
+                      type: devup_error
+                      code: invalid_request_body
+                invalid_request_body_object:
+                  summary: The request body is not a JSON object
+                  value:
+                    error:
+                      message: Request body must be a JSON object.
+                      type: devup_error
+                      code: invalid_request_body
+                invalid_request_body_multipart:
+                  summary: The multipart/form-data body cannot be read
+                  value:
+                    error:
+                      message: The multipart/form-data body could not be read.
+                      type: devup_error
+                      code: invalid_request_body
+                invalid_request_body_parts:
+                  summary: The multipart/form-data body has too many parts
+                  value:
+                    error:
+                      message: The multipart/form-data body has too many parts.
+                      type: devup_error
+                      code: invalid_request_body
+                missing_prompt:
+                  summary: No prompt, on a model that needs one
+                  value:
+                    error:
+                      message: 'The "prompt" field is required.'
+                      type: devup_error
+                      code: missing_prompt
+                invalid_size:
+                  summary: size is not in the form <width>x<height>
+                  value:
+                    error:
+                      message: "Invalid size format \"large\". Expected format '<width>x<height>' (e.g. '1024x1024')."
+                      type: devup_error
+                      code: invalid_size
+                invalid_size_range:
+                  summary: A size outside 64 to 4096 pixels on a side
+                  value:
+                    error:
+                      message: Image dimensions must be between 64 and 4096 pixels (received 32x32).
+                      type: devup_error
+                      code: invalid_size
+                invalid_dimensions:
+                  summary: width or height is not an integer between 64 and 4096
+                  value:
+                    error:
+                      message: Explicit width and height must be integers between 64 and 4096 pixels (received width=5000, height=512).
+                      type: devup_error
+                      code: invalid_dimensions
+                invalid_steps:
+                  summary: num_inference_steps is not a positive number
+                  value:
+                    error:
+                      message: Inference steps must be a positive number.
+                      type: devup_error
+                      code: invalid_steps
+                unsupported_parameter_output_format:
+                  summary: output_format is svg
+                  value:
+                    error:
+                      message: '`output_format` `svg` is not available on this model.'
+                      type: devup_error
+                      code: unsupported_parameter
                 invalid_n:
                   summary: n is not a whole number from 1 to 10
                   value:
@@ -1075,9 +1145,37 @@ paths:
                   summary: Missing model field
                   value:
                     error:
-                      message: 'The "model" field is required. Example: "stabilityai/stable-diffusion-xl-base-1.0"'
+                      message: 'The "model" field is required. Example: "black-forest-labs/FLUX-1-schnell"'
                       type: devup_error
                       code: missing_model
+                invalid_request_body:
+                  summary: The request body is not valid JSON
+                  value:
+                    error:
+                      message: Request body must be valid JSON.
+                      type: devup_error
+                      code: invalid_request_body
+                invalid_request_body_multipart:
+                  summary: The multipart/form-data body cannot be read
+                  value:
+                    error:
+                      message: The multipart/form-data body could not be read.
+                      type: devup_error
+                      code: invalid_request_body
+                missing_prompt:
+                  summary: No prompt, on a model that needs one
+                  value:
+                    error:
+                      message: 'The "prompt" field is required.'
+                      type: devup_error
+                      code: missing_prompt
+                unsupported_parameter_output_format:
+                  summary: output_format is svg
+                  value:
+                    error:
+                      message: '`output_format` `svg` is not available on this model.'
+                      type: devup_error
+                      code: unsupported_parameter
                 invalid_value_option:
                   summary: An image option value the model does not accept
                   value:
@@ -1409,9 +1507,8 @@ paths:
             schema:
               $ref: '#/components/schemas/SpeechRequest'
             example:
-              model: tts-1
+              model: hexgrad/Kokoro-82M
               input: Welcome to DEVUP AI.
-              voice: aura-asteria-en
               response_format: mp3
       responses:
         '200':
@@ -1449,6 +1546,20 @@ paths:
                       message: 'The "model" field is required.'
                       type: devup_error
                       code: missing_model
+                invalid_request_body:
+                  summary: The request body is not valid JSON
+                  value:
+                    error:
+                      message: Request body must be valid JSON.
+                      type: devup_error
+                      code: invalid_request_body
+                missing_input:
+                  summary: Missing input field
+                  value:
+                    error:
+                      message: 'The "input" field is required (text to synthesize).'
+                      type: devup_error
+                      code: missing_input
                 reference_audio_required:
                   summary: referenceAudioUrl required by this model
                   value:
@@ -1474,7 +1585,7 @@ paths:
                   summary: The voice is not one of this model's voices
                   value:
                     error:
-                      message: 'Invalid voice "my-voice" for model "x". Valid voices: aura-asteria-en, ...'
+                      message: 'Invalid voice "my-voice" for model "hexgrad/Kokoro-82M". Valid voices: <the voices the model lists>'
                       type: devup_error
                       code: invalid_voice
         '401':
@@ -1567,7 +1678,31 @@ paths:
                 type: string
               example: Hello, this is a test recording.
         '400':
-          $ref: '#/components/responses/BadRequest'
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          description: Invalid request body or parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_content_type:
+                  summary: The request is not multipart/form-data
+                  value:
+                    error:
+                      message: Audio transcription requires multipart/form-data with a 'file' field.
+                      type: devup_error
+                      code: invalid_content_type
+                invalid_request_body:
+                  summary: The multipart/form-data body cannot be read
+                  value:
+                    error:
+                      message: The multipart/form-data body could not be read.
+                      type: devup_error
+                      code: invalid_request_body
         '401':
           $ref: '#/components/responses/Unauthorized'
         '402':
@@ -1620,12 +1755,12 @@ paths:
               basic:
                 summary: Prompt only
                 value:
-                  model: example-org/example-video-model
+                  model: Lightricks/LTX-2.3-Fast
                   prompt: A cat astronaut floating in space
               options:
                 summary: Video options and a first frame (values from the model page)
                 value:
-                  model: example-org/example-video-model
+                  model: Lightricks/LTX-2.3-Fast
                   prompt: A paper boat drifting down a rain-soaked street at dusk.
                   duration: 8
                   aspect_ratio: '16:9'
@@ -1634,7 +1769,7 @@ paths:
               references:
                 summary: Reference images and a reference video (kinds and limits from the model page)
                 value:
-                  model: example-org/example-video-model
+                  model: Lightricks/LTX-2.3-Fast
                   prompt: The person in image 1 walks through the street from video 1, carrying the bag from image 2.
                   reference_images:
                     - https://example.com/person.png
@@ -1644,7 +1779,7 @@ paths:
               voice:
                 summary: A voice and a script, on a model that speaks the prompt (values from the model page)
                 value:
-                  model: example-org/example-video-model
+                  model: Lightricks/LTX-2.3-Fast
                   prompt: Welcome to our shop. Today we show you three new products.
                   voice: aria
                   voice_language: en
@@ -1798,6 +1933,41 @@ paths:
                       message: '`prompt` can be up to 1500 characters on this model.'
                       type: devup_error
                       code: invalid_value
+                invalid_request_body:
+                  summary: The request body is not valid JSON
+                  value:
+                    error:
+                      message: Request body must be valid JSON.
+                      type: devup_error
+                      code: invalid_request_body
+                invalid_request_body_object:
+                  summary: The request body is not a JSON object
+                  value:
+                    error:
+                      message: Request body must be a JSON object.
+                      type: devup_error
+                      code: invalid_request_body
+                invalid_request_body_multipart:
+                  summary: The multipart/form-data body cannot be read
+                  value:
+                    error:
+                      message: The multipart/form-data body could not be read.
+                      type: devup_error
+                      code: invalid_request_body
+                invalid_request_body_edit:
+                  summary: A video edit without its video or mask
+                  value:
+                    error:
+                      message: Both video and mask (file or URL) are required for mask_video mode.
+                      type: devup_error
+                      code: invalid_request_body
+                missing_prompt:
+                  summary: Missing prompt field
+                  value:
+                    error:
+                      message: 'The "prompt" field is required.'
+                      type: devup_error
+                      code: missing_prompt
         '401':
           $ref: '#/components/responses/Unauthorized'
         '402':
@@ -2015,7 +2185,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error:
-                  message: 'The model "deepseek-ai/DeepSeek-V9" does not exist. List available models with GET /v1/models.'
+                  message: 'The model "<creator>/<model>" does not exist. List available models with GET /v1/models.'
                   type: devup_error
                   code: model_not_found
         '429':
@@ -2174,7 +2344,34 @@ paths:
               example:
                 balance_dzd: 500.00
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          description: >
+            No valid API key and no signed-in session. `error.code` is
+            `invalid_api_key` for a key that is not valid, and `unauthorized`
+            when neither an API key nor a session is present.
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unauthorized:
+                  summary: Neither an API key nor a signed-in session
+                  value:
+                    error:
+                      message: 'Unauthorized: Provide your API key as Authorization: Bearer sk-devup-... or log in.'
+                      type: devup_error
+                      code: unauthorized
+                invalid_api_key:
+                  summary: The API key is not valid or is inactive
+                  value:
+                    error:
+                      message: Invalid or inactive API key.
+                      type: devup_error
+                      code: invalid_api_key
         '403':
           $ref: '#/components/responses/Forbidden'
         '500':
@@ -2915,8 +3112,9 @@ components:
                   code: invalid_request_error
     NotFound:
       description: >
-        The requested model identifier was not found in the catalog.
-        It is not retryable unless the model identifier is changed.
+        The requested model identifier was not found in the catalog, or no
+        endpoint exists at the method and path. It is not retryable unless the
+        model identifier, or the method and path, are changed.
       headers:
         x-request-id:
           $ref: '#/components/headers/XRequestId'
@@ -2934,6 +3132,13 @@ components:
                   message: "The requested model was not found."
                   type: devup_error
                   code: model_not_found
+            endpoint_not_found:
+              summary: No endpoint at this method and path
+              value:
+                error:
+                  message: No endpoint exists at POST /v1/chat/completion.
+                  type: devup_error
+                  code: endpoint_not_found
     ServiceUnavailable:
       description: >
         Requests are temporarily paused or the requested model is temporarily unavailable.
@@ -3060,7 +3265,7 @@ components:
         max_tokens:
           type: integer
           minimum: 1
-          description: Maximum tokens to generate in the response. The largest accepted value is the model's own `max_output_tokens` in `GET /v1/models`; a larger value (for `max_tokens` or `max_completion_tokens`) returns HTTP 400 `invalid_max_tokens`. When neither is sent, the reply is limited to the model's default output length, which is at most its `max_output_tokens`. Reasoning models spend part of this budget thinking before they answer. With images, audio or video in the request, set it high enough — 2000 or more is a safe start — or the reply can come back empty with finish_reason "length".
+          description: Maximum tokens to generate in the response. The largest accepted value is the model's own `max_output_tokens` in `GET /v1/models`; a larger value (for `max_tokens` or `max_completion_tokens`) returns HTTP 400 `invalid_max_tokens`. When neither is sent, the reply is limited to the model's default output length, which is at most its `max_output_tokens`. Reasoning models spend part of this budget thinking before they answer. With images, audio or video in the request, set it high enough — 2000 or more is a safe start — or the reply can come back empty with finish_reason "length". The value must also leave room for the prompt inside the model's `context_window`; otherwise HTTP 400 `context_length_exceeded`, not billed.
         temperature:
           type: number
           minimum: 0
@@ -3136,7 +3341,9 @@ components:
             `max_tokens`: the largest accepted value is the model's own
             `max_output_tokens` in `GET /v1/models`, and a larger value returns HTTP 400
             `invalid_max_tokens`. Send either `max_tokens` or `max_completion_tokens`; when
-            both are sent, `max_completion_tokens` can take precedence.
+            both are sent, `max_completion_tokens` can take precedence. The value must also
+            leave room for the prompt inside the model's `context_window`; otherwise HTTP 400
+            `context_length_exceeded`, not billed.
         n:
           type: [integer, "null"]
           minimum: 1
@@ -3289,7 +3496,7 @@ components:
           properties:
             cached_tokens:
               type: integer
-              description: Number of prompt tokens served from cache.
+              description: Prompt tokens that repeat content of an earlier request, billed at the model's lower input price for them.
         completion_tokens_details:
           type: [object, "null"]
           description: Breakdown of completion token consumption. May be null or omitted.
@@ -3539,7 +3746,9 @@ components:
             model's own `max_output_tokens` in `GET /v1/models`. A larger value, or one
             that is not a whole number, returns HTTP 400 `invalid_max_tokens`. When
             omitted, the reply is limited to the model's default output length, which is
-            at most its `max_output_tokens`.
+            at most its `max_output_tokens`. The value must also leave room for the prompt
+            inside the model's `context_window`; otherwise HTTP 400
+            `context_length_exceeded`, not billed.
         reasoning:
           type: object
           properties:
@@ -3748,6 +3957,7 @@ components:
               type: integer
             output_tokens:
               type: integer
+              description: Tokens in the reply, reasoning tokens included.
             total_tokens:
               type: integer
             input_tokens_details:
@@ -3755,12 +3965,13 @@ components:
               properties:
                 cached_tokens:
                   type: integer
-                  description: Number of prompt tokens served from cache.
+                  description: Prompt tokens that repeat content of an earlier request, billed at the model's lower input price for them.
             output_tokens_details:
               type: object
               properties:
                 reasoning_tokens:
                   type: integer
+                  description: Reasoning tokens, counted in `output_tokens`.
           additionalProperties: true
         _devup:
           $ref: '#/components/schemas/DevUpBilling'
@@ -4197,7 +4408,7 @@ components:
 
     ImageGenerationRequest:
       type: object
-      required: [model, prompt]
+      required: [model]
       description: >
         Models offer different image options. Each model lists its options, and
         the values it accepts, on its model page. The rules below apply to
@@ -4418,8 +4629,12 @@ components:
           description: The text to synthesize into speech.
         voice:
           type: string
-          default: aura-asteria-en
-          description: Voice preset to use.
+          description: >
+            Voice preset to use, one of the voices the model lists on its model
+            page. A voice the model does not list returns HTTP 400
+            `invalid_voice`; a model that needs a voice returns HTTP 400
+            `voice_required` without one. When omitted, the model's default
+            voice is used.
         response_format:
           type: string
           enum: [mp3, opus, aac, flac, wav, pcm]
@@ -4462,6 +4677,20 @@ components:
         language:
           type: string
           description: ISO-639-1 language code to hint the recognizer.
+        prompt:
+          type: string
+          description: Text that guides the transcription, such as names or terms the audio contains.
+        temperature:
+          type: number
+          description: Sampling temperature of the transcription, between 0 and 1.
+        timestamp_granularities:
+          type: array
+          items:
+            type: string
+            enum: [word, segment]
+          description: >
+            Timestamp detail to return with `verbose_json`: `word`, `segment`, or
+            both. Sent as one `timestamp_granularities[]` form part per value.
         response_format:
           type: string
           enum: [json, verbose_json, text, srt, vtt]
@@ -4930,6 +5159,18 @@ components:
         size:
           type: string
           description: Exact output size as `WIDTHxHEIGHT`. See `VideoGenerationRequest`.
+        width:
+          type: integer
+          minimum: 1
+          description: Output width in pixels, sent together with `height`. See `VideoGenerationRequest`.
+        height:
+          type: integer
+          minimum: 1
+          description: Output height in pixels, sent together with `width`. See `VideoGenerationRequest`.
+        num_frames:
+          type: integer
+          deprecated: true
+          description: Deprecated. Use `duration`.
         generate_audio:
           type: boolean
           description: Whether the video has an audio track. See `VideoGenerationRequest`.
@@ -5089,7 +5330,9 @@ components:
             `multimodal` and `OCR`. New values can be added.
         context_window:
           type: [integer, "null"]
-          description: The maximum context size (input + output tokens) for this model. An integer, or null when not set.
+          description: >
+            The model's context window in tokens: one budget shared by the prompt and
+            the reply, reasoning tokens included. An integer, or null when not set.
         context_length:
           type: string
           description: A short display label for the context size.
@@ -5105,6 +5348,10 @@ components:
             `invalid_request_error`). A request that sends none of these parameters is
             limited to the model's default output length, which is at most this value.
             Listed for models that generate text (`type` `text-generation`).
+            The reply is also bounded by the room the prompt leaves in `context_window`:
+            `min(max_output_tokens, context_window − prompt tokens)`; a request whose
+            prompt plus output cap does not fit returns HTTP 400 `context_length_exceeded`
+            and is not billed.
           example: 8192
         is_replaced:
           type: boolean

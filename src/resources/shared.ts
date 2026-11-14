@@ -72,6 +72,20 @@ export function toBlob(value: BinaryInput): Blob {
     return value;
 }
 
+/** Narrowing helper: a file given as a `Blob`, `File` or `Uint8Array`. */
+export function isBinaryInput(value: unknown): value is BinaryInput {
+    return value instanceof Uint8Array || (typeof Blob !== "undefined" && value instanceof Blob);
+}
+
+/** Appends a file as a form part, or a text value (an HTTPS URL or a data URI) as a text part. */
+export function appendInput(form: FormData, name: string, value: BinaryInput | string): void {
+    if (typeof value === "string") {
+        form.append(name, value);
+        return;
+    }
+    form.append(name, toBlob(value));
+}
+
 /** Appends a scalar form field when the value is set (`undefined` and `null` are skipped). */
 export function appendField(form: FormData, name: string, value: string | number | boolean | null | undefined): void {
     if (value === undefined || value === null) return;

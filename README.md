@@ -65,14 +65,14 @@ It gives you one consistent interface for:
 - Text-to-speech and transcription
 - Video generation and editing
 - Native inference for specialized models
-- Model discovery, account balance, and health checks
+- Model discovery, account profile and balance, and health checks
 - Webhook signature verification
 - The Vercel AI SDK, through the optional `devupai/ai` integration
 
 > **Core client:** zero runtime dependencies, ESM and CommonJS.  
 > **Vercel AI SDK integration:** the optional, ESM-only `devupai/ai` export.
 
-Upgrading from 3.x? Read [MIGRATION_V3_TO_V4.md](./MIGRATION_V3_TO_V4.md) and the [CHANGELOG](./CHANGELOG.md).
+Upgrading from 3.x? Read [MIGRATION_V3_TO_V4.md](https://github.com/devupai-platform/devupai-node/blob/main/MIGRATION_V3_TO_V4.md) and the [CHANGELOG](https://github.com/devupai-platform/devupai-node/blob/main/CHANGELOG.md).
 
 ## Contents
 
@@ -129,7 +129,7 @@ Upgrading from 3.x? Read [MIGRATION_V3_TO_V4.md](./MIGRATION_V3_TO_V4.md) and th
 ## Requirements
 
 - Node.js **22.12.0** or later.
-- For `devupai/ai`: `ai` 7, `@ai-sdk/openai-compatible` 3, and `@ai-sdk/provider` 4. The integration is ESM-only.
+- For `devupai/ai`: the peers `@ai-sdk/openai-compatible` 3 and `@ai-sdk/provider` 4. The integration requires `ai` 7 in your app and is ESM-only.
 
 ---
 
@@ -210,6 +210,8 @@ key with [`client.models.list()`](#models-balance-and-health).
 | List models          | `client.models.list()`                 | Yes                      |
 | Retrieve a model     | `client.models.retrieve(id)`           | Yes                      |
 | Account balance      | `client.balance.retrieve()`            | Yes                      |
+| Account profile      | `client.me.retrieve()`                 | Yes                      |
+| Account picture      | `client.me.avatar()`                   | Yes                      |
 | Service health       | `client.health.check()`                | No                       |
 | Webhook verification | `client.webhooks.verifySignature()`    | None (local computation) |
 | Webhook construction | `client.webhooks.constructEvent()`     | None (local computation) |
@@ -266,6 +268,8 @@ to a `Stream<ChatCompletionChunk>` that you read with `for await`.
   fields when the API returns them.
 - The stream exposes `stream.response`, `stream.requestId`, and
   `stream.warnings` before you read the first chunk.
+- `stream.clientRequestId` is the `x-client-request-id` response header, or
+  `null` when the response has none.
 
 ```typescript
 import DevupAI from "devupai";
@@ -457,6 +461,42 @@ generateImage().catch(console.error);
 <details>
 <summary><strong>Edit an image</strong></summary>
 
+`client.images.edit()` posts to `POST /v1/images/edits`. Each input image is
+an `https://` URL or a `data:` URI (as a string or as `{ image_url }`), or a
+file (`Blob`, `File`, or `Uint8Array`). Pass one input as `image`, or several
+as an array; the first is the one an optional `mask` or `markup` applies to.
+Every `images.generate()` field (`prompt`, `size`, `quality`,
+`output_format`, ...) is accepted. The SDK sends JSON when no input is a file
+(`ImageEditJsonParams`, where the array can also be named `images`) and
+`multipart/form-data` when any input is a file (`ImageEditParams`). Replace
+`<image-edit-model-id>` with a model that supports image edits; see the
+[model catalog](https://devupai.com/models).
+
+With image URLs:
+
+```typescript
+import DevupAI from "devupai";
+
+const client = new DevupAI({
+  apiKey: process.env.DEVUP_API_KEY!,
+});
+
+async function editImageFromUrl() {
+  const response = await client.images.edit({
+    model: "<image-edit-model-id>",
+    image: "https://example.com/street.png",
+    prompt: "Add a red sports car in the foreground",
+  });
+
+  console.log(response.data[0]?.url);
+  console.log("Cost:", response._devup?.cost_dzd, "DZD");
+}
+
+editImageFromUrl().catch(console.error);
+```
+
+With files:
+
 ```typescript
 import { readFile } from "node:fs/promises";
 import DevupAI from "devupai";
@@ -465,21 +505,25 @@ const client = new DevupAI({
   apiKey: process.env.DEVUP_API_KEY!,
 });
 
-async function editImage() {
+async function editImageFromFiles() {
   const image = new Blob([await readFile("input.png")], {
+    type: "image/png",
+  });
+  const mask = new Blob([await readFile("mask.png")], {
     type: "image/png",
   });
 
   const response = await client.images.edit({
     model: "<image-edit-model-id>",
     image,
-    prompt: "Add a red sports car in the foreground",
+    mask,
+    prompt: "Replace the masked area with a garden",
   });
 
   console.log(response.data[0]?.url);
 }
 
-editImage().catch(console.error);
+editImageFromFiles().catch(console.error);
 ```
 
 </details>
@@ -617,7 +661,9 @@ createSpeech().catch(console.error);
 <summary><strong>Speech-to-text</strong></summary>
 
 `response_format` `json` and `verbose_json` return an object; `text`, `srt`, and
-`vtt` return a string.
+`vtt` return a string. The request also accepts `prompt`, `temperature`, and,
+with `response_format: "verbose_json"`, `timestamp_granularities` (an array of
+`"word"` and `"segment"`).
 
 ```typescript
 import { readFile } from "node:fs/promises";
@@ -643,6 +689,36 @@ async function transcribeAudio() {
 }
 
 transcribeAudio().catch(console.error);
+```
+
+With `verbose_json`, request word or segment timestamps:
+
+```typescript
+import { readFile } from "node:fs/promises";
+import DevupAI from "devupai";
+
+const client = new DevupAI({
+  apiKey: process.env.DEVUP_API_KEY!,
+});
+
+async function transcribeWithTimestamps() {
+  const audio = new Blob([await readFile("speech.wav")], {
+    type: "audio/wav",
+  });
+
+  const transcript = await client.audio.transcriptions.create({
+    file: audio,
+    model: "openai/whisper-large-v3-turbo",
+    response_format: "verbose_json",
+    timestamp_granularities: ["word", "segment"],
+    prompt: "DEVUP AI, Algiers",
+    temperature: 0,
+  });
+
+  console.log(transcript.text);
+}
+
+transcribeWithTimestamps().catch(console.error);
 ```
 
 </details>
@@ -673,6 +749,51 @@ async function generateVideo() {
 
 generateVideo().catch(console.error);
 ```
+
+</details>
+
+<details>
+<summary><strong>Generate a video from frames or reference media</strong></summary>
+
+With strings only (`VideoGenerationCreateParams`), the request is sent as JSON:
+`image`, `last_frame_image`, and the `reference_*` fields take `https://` URLs
+or `data:` URIs, as a string or as `{ image_url }`. When any of `image`,
+`last_frame_image`, `reference_images`, `reference_videos`, or
+`reference_audios` is a file (`Blob`, `File`, or `Uint8Array`), the request is
+sent as `multipart/form-data` (`VideoGenerationCreateFormParams`; one input is
+a `VideoMediaInput`). The three `reference_*` fields take one item or an array.
+Replace `<image-to-video-model-id>` with a model that takes a first frame; see
+the [model catalog](https://devupai.com/models).
+
+```typescript
+import { readFile } from "node:fs/promises";
+import DevupAI from "devupai";
+
+const client = new DevupAI({
+  apiKey: process.env.DEVUP_API_KEY!,
+});
+
+async function generateVideoFromImage() {
+  const firstFrame = new Blob([await readFile("first-frame.png")], {
+    type: "image/png",
+  });
+
+  const response = await client.video.generations.create({
+    model: "<image-to-video-model-id>",
+    prompt: "The camera slowly pulls back from the harbour",
+    image: firstFrame,
+  });
+
+  console.log(response.data[0]?.url);
+}
+
+generateVideoFromImage().catch(console.error);
+```
+
+The related types are exported: `VideoGenerationFormRequest`,
+`VideoFrameImage`, `VideoReferenceImage`, `VideoReferenceVideo`,
+`VideoReferenceAudio`, `VideoReferenceVoiceAudio`, `VideoMediaInput`, and
+`VideoGenerationCreateFormParams`.
 
 </details>
 
@@ -722,10 +843,13 @@ editVideo().catch(console.error);
 
 ## Native Inference
 
-Native inference sends a JSON payload in the model's own request format to
-`POST /v1/inference/{model}`. The payload and the response shape depend on the
-model. The response type defaults to `unknown`; provide a generic type when
-your application knows the shape.
+Native inference sends a payload in the model's own request format to
+`POST /v1/inference/{model}`: a JSON object, or a `FormData` that is sent as
+`multipart/form-data` as it is. The payload and the response shape depend on
+the model. The response type defaults to `unknown`; provide a generic type when
+your application knows the shape. For a model that answers with a file, pass
+the request option `responseType: "binary"`: the call then resolves to the
+native `Response` with its body unread. The default is `"json"`.
 
 ```typescript
 import DevupAI from "devupai";
@@ -744,6 +868,42 @@ async function runInference() {
 }
 
 runInference().catch(console.error);
+```
+
+With a `FormData` payload, and with a binary answer:
+
+```typescript
+import { readFile } from "node:fs/promises";
+import DevupAI from "devupai";
+
+const client = new DevupAI({
+  apiKey: process.env.DEVUP_API_KEY!,
+});
+
+async function runInferenceWithFiles() {
+  const form = new FormData();
+  form.append(
+    "image",
+    new Blob([await readFile("photo.jpg")], { type: "image/jpeg" }),
+    "photo.jpg",
+  );
+
+  // multipart/form-data request, JSON answer.
+  const result = await client.inference.run<Record<string, unknown>>("<model-id>", form);
+  console.log(Object.keys(result));
+
+  // A model that answers with a file: read the native Response.
+  const file = await client.inference.run(
+    "<model-id>",
+    { input: "A lighthouse at night" },
+    { responseType: "binary" },
+  );
+  console.log("Content-Type:", file.headers.get("content-type"));
+  const bytes = await file.arrayBuffer();
+  console.log("Bytes:", bytes.byteLength);
+}
+
+runInferenceWithFiles().catch(console.error);
 ```
 
 Add a `webhook` URL to the payload to receive the result asynchronously; see
@@ -781,6 +941,68 @@ inspectAccount().catch(console.error);
 ```
 
 `models.retrieve(id)` accepts ids that contain `/`; the SDK encodes them.
+
+Both model calls accept the request option `ifNoneMatch: "<etag>"`, sent as
+`If-None-Match`. When the API answers 304 Not Modified, the call resolves to
+`null` (the result type becomes `ModelListResponse | null` or
+`ModelObject | null` for that call), and `withResponse()` gives the 304
+response with its `ETag` header.
+
+```typescript
+import DevupAI from "devupai";
+
+const client = new DevupAI({
+  apiKey: process.env.DEVUP_API_KEY!,
+});
+
+async function listModelsIfChanged() {
+  const { data, response } = await client.models.list().withResponse();
+  console.log(`${data.data.length} models`);
+
+  const etag = response.headers.get("etag");
+  if (etag) {
+    const refreshed = await client.models.list({ ifNoneMatch: etag });
+    console.log(refreshed === null ? "Not modified" : `${refreshed.data.length} models`);
+  }
+}
+
+listModelsIfChanged().catch(console.error);
+```
+
+### Account profile
+
+`client.me.retrieve()` calls `GET /v1/me` and returns an `AccountProfile`:
+`display_name`, `initial`, `email_hint`, and `avatar` (an `AccountAvatar`,
+`{ url, etag }`, or `null` when the account has no picture).
+`client.me.avatar()` fetches the picture itself and resolves to the native
+`Response` with its body unread; read `Content-Type` (`image/png`,
+`image/jpeg`, or `image/webp`) and `ETag` from its headers. Pass
+`ifNoneMatch: "<etag>"` to send `If-None-Match`; a 304 resolves with that
+`Response` (status 304, empty body).
+
+```typescript
+import DevupAI from "devupai";
+
+const client = new DevupAI({
+  apiKey: process.env.DEVUP_API_KEY!,
+});
+
+async function showProfile() {
+  const profile = await client.me.retrieve();
+  console.log(profile.display_name, profile.initial, profile.email_hint);
+
+  if (profile.avatar) {
+    const picture = await client.me.avatar();
+    console.log("Content-Type:", picture.headers.get("content-type"));
+    console.log("Bytes:", (await picture.arrayBuffer()).byteLength);
+
+    const again = await client.me.avatar({ ifNoneMatch: profile.avatar.etag });
+    console.log(again.status === 304 ? "Same picture" : "New picture");
+  }
+}
+
+showProfile().catch(console.error);
+```
 
 ---
 
@@ -899,7 +1121,7 @@ lets you rotate secrets without downtime.
 `devupai/ai` connects DEVUP AI to the [Vercel AI SDK](https://ai-sdk.dev) 7.
 
 - **ESM-only:** use `import`, not `require`.
-- **Peers:** `ai` 7, `@ai-sdk/openai-compatible` 3, and `@ai-sdk/provider` 4.
+- **Peers:** `@ai-sdk/openai-compatible` 3 and `@ai-sdk/provider` 4. The integration requires `ai` 7 in your app.
 - **Node.js:** 22.12 or later.
 
 ```bash
@@ -909,7 +1131,7 @@ npm install devupai ai @ai-sdk/openai-compatible @ai-sdk/provider
 `createDevupAI()` takes `apiKey`, `baseURL`, `headers`, `fetch`, and `models`.
 When `apiKey` is omitted, it reads `DEVUP_API_KEY` (then `DEVUPAI_API_KEY`)
 from the environment when a request is made; with no key, the request throws
-`LoadAPIKeyError`. An `Authorization` entry in `headers` is ignored: the key
+`LoadAPIKeyError`. An `Authorization` entry in `headers` is not sent: the key
 always comes from `apiKey`. A default instance is exported as `devupai`.
 
 | Model factory                                    | Use                                                |
@@ -1019,7 +1241,13 @@ const devupai = createDevupAI({ apiKey, models });
 ## Next.js plain-text streaming
 
 ```typescript
-import { streamText } from "ai";
+import {
+  convertToModelMessages,
+  createTextStreamResponse,
+  streamText,
+  toTextStream,
+  type UIMessage,
+} from "ai";
 import { createDevupAI } from "devupai/ai";
 
 const devupai = createDevupAI({
@@ -1027,21 +1255,27 @@ const devupai = createDevupAI({
 });
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  const body = (await request.json()) as { messages: UIMessage[] };
 
   const result = streamText({
     model: devupai("deepseek-ai/DeepSeek-V4.1-Flash-1017"),
-    messages: body.messages,
+    messages: await convertToModelMessages(body.messages),
   });
 
-  return result.toTextStreamResponse();
+  return createTextStreamResponse({ stream: toTextStream({ stream: result.stream }) });
 }
 ```
 
 ## Next.js UI streaming
 
 ```typescript
-import { streamText } from "ai";
+import {
+  convertToModelMessages,
+  createUIMessageStreamResponse,
+  streamText,
+  toUIMessageStream,
+  type UIMessage,
+} from "ai";
 import { createDevupAI } from "devupai/ai";
 
 const devupai = createDevupAI({
@@ -1049,14 +1283,14 @@ const devupai = createDevupAI({
 });
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  const body = (await request.json()) as { messages: UIMessage[] };
 
   const result = streamText({
     model: devupai("deepseek-ai/DeepSeek-V4.1-Flash-1017"),
-    messages: body.messages,
+    messages: await convertToModelMessages(body.messages),
   });
 
-  return result.toUIMessageStreamResponse();
+  return createUIMessageStreamResponse({ stream: toUIMessageStream({ stream: result.stream }) });
 }
 ```
 
@@ -1106,6 +1340,8 @@ Every method takes request options as its last argument.
 | `maxRetries`        | `number`                 | Retries for this call, instead of the client `maxRetries`.        |
 | `headers`           | `Record<string, string>` | Extra headers for this request.                                   |
 | `streamIdleTimeout` | `number`                 | Idle limit for this stream, instead of the client setting.        |
+| `ifNoneMatch`       | `string`                 | Sends `If-None-Match` with this value (`models.list()`, `models.retrieve()`, `me.avatar()`). |
+| `responseType`      | `"json" \| "binary"`     | `inference.run()` only: `"binary"` resolves to the native `Response`, body unread. |
 
 ```typescript
 import DevupAI from "devupai";
@@ -1155,6 +1391,7 @@ method: `.withResponse()`. It resolves to:
 | `data`      | `T`              | The same value that `await` returns.                                |
 | `response`  | `Response`       | The HTTP response, with its status and headers.                     |
 | `requestId` | `string \| null` | The `x-request-id` header. Include it when you contact support.     |
+| `clientRequestId` | `string \| null` | The `x-client-request-id` header.                             |
 | `warnings`  | `string[]`       | Informational notices about how the request was handled.            |
 
 ```typescript
@@ -1185,8 +1422,8 @@ main().catch(console.error);
 ```
 
 Streams expose the same information directly: `stream.response`,
-`stream.requestId`, and `stream.warnings`. Errors carry `requestId` and
-`warnings` too.
+`stream.requestId`, `stream.clientRequestId`, and `stream.warnings`. Errors carry `requestId`,
+`clientRequestId`, and `warnings` too.
 
 `warnings` comes from the `X-DEVUP-Warnings` response header. Notices are
 informational: the request was answered.
@@ -1195,7 +1432,7 @@ informational: the request was answered.
 
 # Retries
 
-Transient errors (429, 502, 503, 504, network) are retried with backoff; set `maxRetries` to change it.
+Transient errors (408, 429, 502, 503, 504, network) are retried with backoff; set `maxRetries` to change it.
 
 ```typescript
 import DevupAI from "devupai";
@@ -1225,6 +1462,8 @@ main().catch(console.error);
   Set `streamIdleTimeout` to stop a stream when no data arrives for that many
   milliseconds.
 - A timeout throws `APITimeoutError`.
+- For video generation and long `inference.run` calls, set a longer `timeout`
+  (for example `900_000`) and `maxRetries: 0`.
 - Pass `signal` to cancel a call. A signal that is already aborted rejects the
   call before any request is sent; an abort rejects with the signal's reason.
 
@@ -1289,6 +1528,7 @@ the HTTP status, so you can catch a specific case or the base class.
 | `code`         | `string \| undefined`    | Machine-readable error code when available.                              |
 | `param`        | `string \| null`         | The request parameter the error refers to, when available.               |
 | `requestId`    | `string \| null`         | The `x-request-id` header. Include it when you contact support.          |
+| `clientRequestId` | `string \| null`      | The `x-client-request-id` header.                                        |
 | `retryAfter`   | `string \| null`         | Raw `Retry-After` response header value.                                 |
 | `retryAfterMs` | `number \| null`         | Suggested wait in milliseconds, when the response gives one.             |
 | `warnings`     | `string[]`               | Informational notices about how the request was handled.                 |
@@ -1472,8 +1712,8 @@ DEVUP_API_KEY=<your-api-key>
 | Models        | [devupai.com/models](https://devupai.com/models)                         |
 | Status        | [status.devupai.com](https://status.devupai.com/)                        |
 | npm           | [npmjs.com/package/devupai](https://www.npmjs.com/package/devupai)       |
-| Changelog     | [CHANGELOG.md](./CHANGELOG.md)                                           |
-| Migration     | [MIGRATION_V3_TO_V4.md](./MIGRATION_V3_TO_V4.md)                         |
+| Changelog     | [CHANGELOG.md](https://github.com/devupai-platform/devupai-node/blob/main/CHANGELOG.md) |
+| Migration     | [MIGRATION_V3_TO_V4.md](https://github.com/devupai-platform/devupai-node/blob/main/MIGRATION_V3_TO_V4.md) |
 
 ---
 

@@ -6,6 +6,7 @@ import { Embeddings } from "./resources/embeddings";
 import { Health } from "./resources/health";
 import { Images } from "./resources/images";
 import { NativeInference } from "./resources/inference";
+import { Me } from "./resources/me";
 import { Models } from "./resources/models";
 import { Rerank } from "./resources/rerank";
 import { Responses } from "./resources/responses";
@@ -49,6 +50,8 @@ class DevupAI {
     readonly inference: NativeInference;
     /** Account balance. */
     readonly balance: Balance;
+    /** Account profile of the API key. */
+    readonly me: Me;
     /** API health check. */
     readonly health: Health;
     /** Webhook signature verification and event construction. */
@@ -75,6 +78,7 @@ class DevupAI {
         this.video = new Video(this._client);
         this.inference = new NativeInference(this._client);
         this.balance = new Balance(this._client);
+        this.me = new Me(this._client);
         this.health = new Health(this._client);
         this.webhooks = new Webhooks();
     }
@@ -103,7 +107,7 @@ export { APIPromise } from "./core/api-promise";
 export type { WithResponse } from "./core/api-promise";
 export { Stream } from "./core/streaming";
 export { VERSION } from "./core/version";
-export type { ClientOptions, RequestOptions, DebugEvent } from "./core/client";
+export type { ClientOptions, RequestOptions, ConditionalRequestOptions, DebugEvent } from "./core/client";
 
 export {
     verifyWebhookSignature,
@@ -129,6 +133,7 @@ export type { Embeddings } from "./resources/embeddings";
 export type { Rerank } from "./resources/rerank";
 export type { Audio, Speech, Transcriptions } from "./resources/audio";
 export type { Video, VideoGenerations, VideoEdits } from "./resources/video";
-export type { NativeInference } from "./resources/inference";
+export type { NativeInference, InferenceRunOptions } from "./resources/inference";
 export type { Balance } from "./resources/balance";
+export type { Me } from "./resources/me";
 export type { Health } from "./resources/health";

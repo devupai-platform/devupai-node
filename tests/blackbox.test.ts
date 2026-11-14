@@ -63,7 +63,7 @@ function apiHandler(req: RecordedRequest): Response {
     if (url.pathname.endsWith("/audio/speech")) {
         return jsonResponse({ url: "https://api.devupai.com/v1/images/proxy?d=a&s=b", _devup: BILLING });
     }
-    if (url.pathname.endsWith("/video/generations") || url.pathname.endsWith("/images/generations")) {
+    if (url.pathname.endsWith("/video/generations") || url.pathname.endsWith("/images/generations") || url.pathname.endsWith("/images/edits")) {
         return jsonResponse({ created: 1700000000, data: [{ url: "https://example.com/vid.mp4" }], _devup: BILLING });
     }
     return jsonResponse({ ok: true, _devup: BILLING });
@@ -223,11 +223,11 @@ describe("DEVUP AI SDK 4.x - Black-box Tests", () => {
             expect(result.balance_dzd).toBe(99);
         });
 
-        it("images.edit sends multipart to /images/generations", async () => {
+        it("images.edit sends multipart to /images/edits", async () => {
             const blob = new Blob(["img"]);
             await client.images.edit({ image: blob, prompt: "test", model: MODEL_A, response_format: "b64_json" }, { headers: { "X-Test": "1" } });
             const req = mock.last();
-            expect(req.url).toBe(`${BASE}/images/generations`);
+            expect(req.url).toBe(`${BASE}/images/edits`);
             expect(req.method).toBe("POST");
             expect(req.form).toBeInstanceOf(FormData);
             expect(req.form?.get("prompt")).toBe("test");

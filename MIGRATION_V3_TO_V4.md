@@ -2,7 +2,7 @@
 
 `devupai` 4.0.0 is a major release. This guide lists every change that can
 break code written for 3.x, with before and after code. The full list of
-changes is in [CHANGELOG.md](./CHANGELOG.md).
+changes is in [CHANGELOG.md](https://github.com/devupai-platform/devupai-node/blob/main/CHANGELOG.md).
 
 Model ids below are placeholders such as `"<model-id>"`; list the models
 available to your key with `client.models.list()`.
@@ -329,7 +329,7 @@ try {
 
 ## 11. Default retries and timeout
 
-Transient errors (429, 502, 503, 504, network) are retried with backoff; set `maxRetries` to change it.
+Transient errors (408, 429, 502, 503, 504, network) are retried with backoff; set `maxRetries` to change it.
 
 The default `timeout` is 600000 ms (10 minutes) per call. 3.x had no retries
 and no default timeout.
@@ -445,9 +445,9 @@ import type { ClientOptions } from "devupai";
 
 `devupai/ai` is rewritten for the Vercel AI SDK 7.
 
-- **Peers:** `ai` 7, `@ai-sdk/openai-compatible` `>=3 <4`, and
-  `@ai-sdk/provider` `>=4 <5`. Install both `@ai-sdk/*` packages: the
-  integration uses both at runtime.
+- **Peers:** `@ai-sdk/openai-compatible` `>=3 <4` and `@ai-sdk/provider`
+  `>=4 <5`. Install both `@ai-sdk/*` packages: the integration uses both at
+  runtime. The integration requires `ai` 7 in your app.
 - **ESM-only:** the `require` entry is removed. Use `import`.
 - **V4 model types:** the factories return `LanguageModelV4`,
   `EmbeddingModelV4`, and `ImageModelV4`.
@@ -457,7 +457,7 @@ import type { ClientOptions } from "devupai";
   edits.
 - **API key:** read from `apiKey`, else `DEVUP_API_KEY`, then `DEVUPAI_API_KEY`,
   when a request is made. With no key, the request throws `LoadAPIKeyError`.
-  An `Authorization` entry in `headers` is ignored.
+  An `Authorization` entry in `headers` is not sent; the key comes from `apiKey`.
 - **New settings:** `fetch`, and `models` (model data from `GET /v1/models`; a
   model whose `supports.structured_output` is `true` gets `json_schema`
   structured output).

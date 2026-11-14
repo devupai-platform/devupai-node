@@ -153,7 +153,6 @@ const ALLOWED_TEXT: AllowedText[] = [
     { text: "cached?:", files: SCHEMA_FILE, why: "price field of a model for reused prompt tokens" },
     { text: "cached:", files: ["tests/contract.test.ts"], why: "the same price field, in a schema fixture" },
     { text: "cached input tokens", files: SCHEMA_FILE, why: "spec description of that price field" },
-    { text: "served from cache", files: SCHEMA_FILE, why: "spec description of the OpenAI-compatible cached_tokens usage field" },
     { text: "Cache-Control", why: "HTTP header name" },
     // The Vercel AI SDK integration (devupai/ai): package, file and identifier names it must use.
     { text: "@ai-sdk/provider", why: "npm package of the AI SDK model interfaces, a peer dependency (also matches its -utils package)" },

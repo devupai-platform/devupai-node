@@ -413,7 +413,7 @@ export interface components {
             model: string;
             /** @description The conversation history. When the last message in the conversation is from the assistant, the model answers with a new assistant message. A model that cannot answer such a conversation returns HTTP 400 `conversation_must_end_with_user` before any charge. */
             messages: components["schemas"]["ChatMessage"][];
-            /** @description Maximum tokens to generate in the response. The largest accepted value is the model's own `max_output_tokens` in `GET /v1/models`; a larger value (for `max_tokens` or `max_completion_tokens`) returns HTTP 400 `invalid_max_tokens`. When neither is sent, the reply is limited to the model's default output length, which is at most its `max_output_tokens`. Reasoning models spend part of this budget thinking before they answer. With images, audio or video in the request, set it high enough — 2000 or more is a safe start — or the reply can come back empty with finish_reason "length". */
+            /** @description Maximum tokens to generate in the response. The largest accepted value is the model's own `max_output_tokens` in `GET /v1/models`; a larger value (for `max_tokens` or `max_completion_tokens`) returns HTTP 400 `invalid_max_tokens`. When neither is sent, the reply is limited to the model's default output length, which is at most its `max_output_tokens`. Reasoning models spend part of this budget thinking before they answer. With images, audio or video in the request, set it high enough — 2000 or more is a safe start — or the reply can come back empty with finish_reason "length". The value must also leave room for the prompt inside the model's `context_window`; otherwise HTTP 400 `context_length_exceeded`, not billed. */
             max_tokens?: number;
             /** @description Sampling temperature (0–2). */
             temperature?: number;
@@ -453,7 +453,7 @@ export interface components {
              * @enum {string}
              */
             service_tier?: "priority" | "flex";
-            /** @description Maximum tokens to generate in the response, with the same rules as `max_tokens`: the largest accepted value is the model's own `max_output_tokens` in `GET /v1/models`, and a larger value returns HTTP 400 `invalid_max_tokens`. Send either `max_tokens` or `max_completion_tokens`; when both are sent, `max_completion_tokens` can take precedence. */
+            /** @description Maximum tokens to generate in the response, with the same rules as `max_tokens`: the largest accepted value is the model's own `max_output_tokens` in `GET /v1/models`, and a larger value returns HTTP 400 `invalid_max_tokens`. Send either `max_tokens` or `max_completion_tokens`; when both are sent, `max_completion_tokens` can take precedence. The value must also leave room for the prompt inside the model's `context_window`; otherwise HTTP 400 `context_length_exceeded`, not billed. */
             max_completion_tokens?: number;
             /**
              * @description How many choices to generate. A whole number of at least 1 (absent or null means 1); any other value returns HTTP 400 `invalid_value`. A request needs enough balance for the output of every choice.
@@ -538,7 +538,7 @@ export interface components {
             total_tokens?: number;
             /** @description Breakdown of prompt token consumption. May be null or omitted. */
             prompt_tokens_details?: {
-                /** @description Number of prompt tokens served from cache. */
+                /** @description Prompt tokens that repeat content of an earlier request, billed at the model's lower input price for them. */
                 cached_tokens?: number;
             } | null;
             /** @description Breakdown of completion token consumption. May be null or omitted. */
@@ -686,7 +686,7 @@ export interface components {
             }[];
             /** @description System or developer instructions directing the model's behavior. */
             instructions?: string;
-            /** @description Maximum number of output tokens to generate: a whole number from 1 to the model's own `max_output_tokens` in `GET /v1/models`. A larger value, or one that is not a whole number, returns HTTP 400 `invalid_max_tokens`. When omitted, the reply is limited to the model's default output length, which is at most its `max_output_tokens`. */
+            /** @description Maximum number of output tokens to generate: a whole number from 1 to the model's own `max_output_tokens` in `GET /v1/models`. A larger value, or one that is not a whole number, returns HTTP 400 `invalid_max_tokens`. When omitted, the reply is limited to the model's default output length, which is at most its `max_output_tokens`. The value must also leave room for the prompt inside the model's `context_window`; otherwise HTTP 400 `context_length_exceeded`, not billed. */
             max_output_tokens?: number;
             /** @description Reasoning configuration object. */
             reasoning?: {
@@ -810,13 +810,15 @@ export interface components {
             /** @description Token usage of the response. `null` in the response objects that stream events carry before the final event. */
             usage?: ({
                 input_tokens?: number;
+                /** @description Tokens in the reply, reasoning tokens included. */
                 output_tokens?: number;
                 total_tokens?: number;
                 input_tokens_details?: {
-                    /** @description Number of prompt tokens served from cache. */
+                    /** @description Prompt tokens that repeat content of an earlier request, billed at the model's lower input price for them. */
                     cached_tokens?: number;
                 };
                 output_tokens_details?: {
+                    /** @description Reasoning tokens, counted in `output_tokens`. */
                     reasoning_tokens?: number;
                 };
             } & {
@@ -1043,7 +1045,7 @@ export interface components {
             /** @description Image generation model identifier. */
             model: string;
             /** @description Text description of the desired image. */
-            prompt: string;
+            prompt?: string;
             /** @description Text description of what to avoid in the image, up to the length the model lists on its model page. Used only when sent. */
             negative_prompt?: string;
             /**
@@ -1151,10 +1153,7 @@ export interface components {
             model: string;
             /** @description The text to synthesize into speech. */
             input: string;
-            /**
-             * @description Voice preset to use.
-             * @default aura-asteria-en
-             */
+            /** @description Voice preset to use, one of the voices the model lists on its model page. A voice the model does not list returns HTTP 400 `invalid_voice`; a model that needs a voice returns HTTP 400 `voice_required` without one. When omitted, the model's default voice is used. */
             voice?: string;
             /**
              * @description Audio output format.
@@ -1193,6 +1192,12 @@ export interface components {
             model?: string;
             /** @description ISO-639-1 language code to hint the recognizer. */
             language?: string;
+            /** @description Text that guides the transcription, such as names or terms the audio contains. */
+            prompt?: string;
+            /** @description Sampling temperature of the transcription, between 0 and 1. */
+            temperature?: number;
+            /** @description Timestamp detail to return with `verbose_json`: `word`, `segment`, or both. Sent as one `timestamp_granularities[]` form part per value. */
+            timestamp_granularities?: ("word" | "segment")[];
             /**
              * @description Format of the transcription response. `json` returns the text; `verbose_json`
              *     also returns the duration, the segments and, when the model returns them, the
@@ -1372,6 +1377,15 @@ export interface components {
             aspect_ratio?: string;
             /** @description Exact output size as `WIDTHxHEIGHT`. See `VideoGenerationRequest`. */
             size?: string;
+            /** @description Output width in pixels, sent together with `height`. See `VideoGenerationRequest`. */
+            width?: number;
+            /** @description Output height in pixels, sent together with `width`. See `VideoGenerationRequest`. */
+            height?: number;
+            /**
+             * @deprecated
+             * @description Deprecated. Use `duration`.
+             */
+            num_frames?: number;
             /** @description Whether the video has an audio track. See `VideoGenerationRequest`. */
             generate_audio?: boolean;
             /** @description Frame rate, in frames per second. See `VideoGenerationRequest`. */
@@ -1483,12 +1497,12 @@ export interface components {
             owned_by: string;
             /** @description The model's type. Current values: `text-generation`, `embeddings`, `reranker`, `text-to-image`, `text-to-video`, `text-to-speech`, `automatic-speech-recognition`, `zero-shot-image-classification`, `multimodal` and `OCR`. New values can be added. */
             type: string;
-            /** @description The maximum context size (input + output tokens) for this model. An integer, or null when not set. */
+            /** @description The model's context window in tokens: one budget shared by the prompt and the reply, reasoning tokens included. An integer, or null when not set. */
             context_window: number | null;
             /** @description A short display label for the context size. */
             context_length?: string;
             /**
-             * @description The model's own output limit, which differs from model to model: the largest value the model accepts for `max_tokens` and `max_completion_tokens` on `POST /v1/chat/completions`, for `max_output_tokens` on `POST /v1/responses`, and for `max_tokens` on `POST /anthropic/v1/messages`. A larger value returns HTTP 400 `invalid_max_tokens` (on `POST /anthropic/v1/messages`, the same message in an `invalid_request_error`). A request that sends none of these parameters is limited to the model's default output length, which is at most this value. Listed for models that generate text (`type` `text-generation`).
+             * @description The model's own output limit, which differs from model to model: the largest value the model accepts for `max_tokens` and `max_completion_tokens` on `POST /v1/chat/completions`, for `max_output_tokens` on `POST /v1/responses`, and for `max_tokens` on `POST /anthropic/v1/messages`. A larger value returns HTTP 400 `invalid_max_tokens` (on `POST /anthropic/v1/messages`, the same message in an `invalid_request_error`). A request that sends none of these parameters is limited to the model's default output length, which is at most this value. Listed for models that generate text (`type` `text-generation`). The reply is also bounded by the room the prompt leaves in `context_window`: `min(max_output_tokens, context_window − prompt tokens)`; a request whose prompt plus output cap does not fit returns HTTP 400 `context_length_exceeded` and is not billed.
              * @example 8192
              */
             max_output_tokens?: number;
@@ -1836,7 +1850,7 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description The requested model identifier was not found in the catalog. It is not retryable unless the model identifier is changed. */
+        /** @description The requested model identifier was not found in the catalog, or no endpoint exists at the method and path. It is not retryable unless the model identifier, or the method and path, are changed. */
         NotFound: {
             headers: {
                 "x-request-id": components["headers"]["XRequestId"];
@@ -2252,7 +2266,7 @@ export interface operations {
                 "application/json": components["schemas"]["ImageGenerationRequest"];
                 /**
                  * @example {
-                 *       "model": "stabilityai/stable-diffusion-xl-base-1.0",
+                 *       "model": "black-forest-labs/FLUX-1-schnell",
                  *       "prompt": "A futuristic city skyline at sunset",
                  *       "image": "<binary data>",
                  *       "size": "1024x1024",
@@ -2530,9 +2544,8 @@ export interface operations {
             content: {
                 /**
                  * @example {
-                 *       "model": "tts-1",
+                 *       "model": "hexgrad/Kokoro-82M",
                  *       "input": "Welcome to DEVUP AI.",
-                 *       "voice": "aura-asteria-en",
                  *       "response_format": "mp3"
                  *     }
                  */
@@ -2639,7 +2652,17 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            400: components["responses"]["BadRequest"];
+            /** @description Invalid request body or parameters. */
+            400: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             402: components["responses"]["InsufficientBalance"];
             403: components["responses"]["Forbidden"];
@@ -2864,7 +2887,7 @@ export interface operations {
                     /**
                      * @example {
                      *       "error": {
-                     *         "message": "The model \"deepseek-ai/DeepSeek-V9\" does not exist. List available models with GET /v1/models.",
+                     *         "message": "The model \"<creator>/<model>\" does not exist. List available models with GET /v1/models.",
                      *         "type": "devup_error",
                      *         "code": "model_not_found"
                      *       }
@@ -2975,7 +2998,17 @@ export interface operations {
                     "application/json": components["schemas"]["BalanceResponse"];
                 };
             };
-            401: components["responses"]["Unauthorized"];
+            /** @description No valid API key and no signed-in session. `error.code` is `invalid_api_key` for a key that is not valid, and `unauthorized` when neither an API key nor a session is present. */
+            401: {
+                headers: {
+                    "x-request-id": components["headers"]["XRequestId"];
+                    "x-client-request-id": components["headers"]["XClientRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             403: components["responses"]["Forbidden"];
             500: components["responses"]["InternalError"];
         };

@@ -84,6 +84,12 @@ export class Transcriptions extends APIResource {
         appendField(form, "model", body.model);
         appendField(form, "language", body.language);
         appendField(form, "response_format", body.response_format);
+        appendField(form, "prompt", body.prompt);
+        appendField(form, "temperature", body.temperature);
+        // An array field is sent as one `name[]` part per value.
+        for (const granularity of body.timestamp_granularities ?? []) {
+            appendField(form, "timestamp_granularities[]", granularity);
+        }
 
         const request = {
             method: "POST" as const,
