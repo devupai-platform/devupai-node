@@ -1,4 +1,4 @@
-// D3: video.generations.create() sends JSON when every media input is text, and multipart form data when any is a file.
+// video.generations.create() sends JSON when every media input is text, and multipart form data when any is a file.
 import { describe, expect, it } from "vitest";
 import DevupAI from "../src/index";
 import { BASE, MODEL_A, TEST_KEY, jsonResponse, mockFetch, type Handler } from "./helpers/mock-fetch";
@@ -13,8 +13,8 @@ const VIDEO = { created: 1700000000, data: [{ url: "https://example.com/v.mp4" }
 const png = (): Blob => new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" });
 const wav = (): Blob => new Blob([new Uint8Array([82, 73, 70, 70])], { type: "audio/wav" });
 
-describe("video.generations.create: JSON form (D3)", () => {
-    it("(a) the JSON body is unchanged byte for byte, with request options inside params", async () => {
+describe("video.generations.create: JSON form", () => {
+    it("the JSON body is unchanged byte for byte, with request options inside params", async () => {
         const { client, mock } = setup(() => jsonResponse(VIDEO));
         await client.video.generations.create({
             model: MODEL_A,
@@ -39,7 +39,7 @@ describe("video.generations.create: JSON form (D3)", () => {
         expect(req.form).toBeNull();
     });
 
-    it("(e) strings only for image and reference_images stay JSON, arrays preserved", async () => {
+    it("strings only for image and reference_images stay JSON, arrays preserved", async () => {
         const { client, mock } = setup(() => jsonResponse(VIDEO));
         await client.video.generations.create({
             model: MODEL_A,
@@ -60,7 +60,7 @@ describe("video.generations.create: JSON form (D3)", () => {
         });
     });
 
-    it("(f) request options inside params are stripped from the JSON body; the second argument wins", async () => {
+    it("request options inside params are stripped from the JSON body; the second argument wins", async () => {
         const { client, mock } = setup(() => jsonResponse(VIDEO));
         await client.video.generations.create(
             { model: MODEL_A, prompt: "p", timeout: 5000, headers: { "X-Fixture": "params" } },
@@ -73,8 +73,8 @@ describe("video.generations.create: JSON form (D3)", () => {
     });
 });
 
-describe("video.generations.create: multipart form (D3)", () => {
-    it("(b) a Blob image sends FormData with scalars as text", async () => {
+describe("video.generations.create: multipart form", () => {
+    it("a Blob image sends FormData with scalars as text", async () => {
         const { client, mock } = setup(() => jsonResponse(VIDEO));
         const result = await client.video.generations.create({
             model: MODEL_A,
@@ -101,7 +101,7 @@ describe("video.generations.create: multipart form (D3)", () => {
         expect(result).toEqual(VIDEO);
     });
 
-    it("(b) a Uint8Array image is sent as a file part", async () => {
+    it("a Uint8Array image is sent as a file part", async () => {
         const { client, mock } = setup(() => jsonResponse(VIDEO));
         await client.video.generations.create({ model: MODEL_A, prompt: "p", image: new Uint8Array([1, 2, 3]) });
         const part = mock.last().form!.get("image");
@@ -109,7 +109,7 @@ describe("video.generations.create: multipart form (D3)", () => {
         expect((part as Blob).size).toBe(3);
     });
 
-    it("(c) reference fields: one part per item under the plain field name, files then text", async () => {
+    it("reference fields: one part per item under the plain field name, files then text", async () => {
         const { client, mock } = setup(() => jsonResponse(VIDEO));
         await client.video.generations.create({
             model: MODEL_A,
@@ -130,7 +130,7 @@ describe("video.generations.create: multipart form (D3)", () => {
         expect(form.has("reference_videos")).toBe(false);
     });
 
-    it("(c) a text reference next to a file reference in another field is a text part", async () => {
+    it("a text reference next to a file reference in another field is a text part", async () => {
         const { client, mock } = setup(() => jsonResponse(VIDEO));
         await client.video.generations.create({
             model: MODEL_A,
@@ -144,7 +144,7 @@ describe("video.generations.create: multipart form (D3)", () => {
         expect(form.getAll("reference_videos")[0]).toBeInstanceOf(Blob);
     });
 
-    it("(d) last_frame_image as a Blob, image as text", async () => {
+    it("last_frame_image as a Blob, image as text", async () => {
         const { client, mock } = setup(() => jsonResponse(VIDEO));
         await client.video.generations.create({
             model: MODEL_A,
@@ -157,7 +157,7 @@ describe("video.generations.create: multipart form (D3)", () => {
         expect(form.get("last_frame_image")).toBeInstanceOf(Blob);
     });
 
-    it("(f) request options inside params are not form parts; undefined fields are left out", async () => {
+    it("request options inside params are not form parts; undefined fields are left out", async () => {
         const { client, mock } = setup(() => jsonResponse(VIDEO));
         await client.video.generations.create(
             { model: MODEL_A, prompt: "p", image: png(), seed: undefined, timeout: 5000, headers: { "X-Fixture": "params" } },

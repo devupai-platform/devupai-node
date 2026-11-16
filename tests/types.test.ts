@@ -21,14 +21,14 @@ import DevupAI, {
     type TranscriptionVerboseResponse,
     type WithResponse,
 } from "../src/index";
-// @ts-expect-error ChatCompletionBillingChunk was removed in 4.0.0 (block0 §3.9 item 4)
+// @ts-expect-error ChatCompletionBillingChunk was removed in 4.0.0
 import type { ChatCompletionBillingChunk } from "../src/index";
 import { createDevupAI } from "../src/provider";
 import { MODEL_A, MODEL_B, TEST_KEY } from "./helpers/mock-fetch";
 
 /** Compile-only: never called. */
 function typeChecks(client: DevupAI): void {
-    // Defect 2: stream_options compiles and selects the stream overload.
+    // stream_options compiles and selects the stream overload.
     const streamPromise = client.chat.completions.create({
         model: MODEL_A,
         messages: [{ role: "user", content: "Hi" }],
@@ -45,7 +45,7 @@ function typeChecks(client: DevupAI): void {
     expectTypeOf(jsonPromise).toEqualTypeOf<APIPromise<ChatCompletion>>();
     expectTypeOf(jsonPromise.withResponse()).toEqualTypeOf<Promise<WithResponse<ChatCompletion>>>();
 
-    // Defect 3: usage on the chunk without a cast; service_tier, system_fingerprint typed.
+    // Usage on the chunk without a cast; service_tier, system_fingerprint typed.
     const onChunk = (chunk: ChatCompletionChunk): number | undefined => {
         const tier: string | null | undefined = chunk.service_tier;
         const fp: string | undefined = chunk.system_fingerprint;
@@ -57,7 +57,7 @@ function typeChecks(client: DevupAI): void {
     expectTypeOf<ChatCompletionChunk["usage"]>().toEqualTypeOf<TokenUsage | undefined>();
     expectTypeOf<ChatCompletionChunk["_devup"]>().toEqualTypeOf<DevUpBilling | undefined>();
 
-    // Defect 4: "_devup" in chunk does not narrow to a billing-only member: choices stay available.
+    // "_devup" in chunk does not narrow to a billing-only member: choices stay available.
     const narrow = (chunk: ChatCompletionChunk): ChatCompletionChunk["choices"] => {
         if ("_devup" in chunk) return chunk.choices;
         return chunk.choices;
@@ -120,7 +120,7 @@ function typeChecks(client: DevupAI): void {
     expectTypeOf(client.images.download("https://api.devupai.com/v1/images/proxy?d=a&s=b", { headers: { Range: "bytes=0-1" } })).toEqualTypeOf<APIPromise<Response>>();
     // @ts-expect-error images.download takes the URL string, not the 3.x { url } object
     void client.images.download({ url: "https://example.com/a.png" });
-    // @ts-expect-error images.proxy was renamed to images.download in 4.0.0 (D18), with no alias
+    // @ts-expect-error images.proxy was renamed to images.download in 4.0.0, with no alias
     void client.images.proxy;
 
     // Error code is a plain string, never a union of codes.

@@ -1,4 +1,4 @@
-// D5: inference.run() with a JSON payload (unchanged), a FormData payload, and a binary answer.
+// inference.run() with a JSON payload (unchanged), a FormData payload, and a binary answer.
 import { describe, expect, expectTypeOf, it } from "vitest";
 import DevupAI, { type APIPromise } from "../src/index";
 import { BASE, MODEL_A, MODEL_B, REQ_ID, TEST_KEY, headerNames, jsonResponse, mockFetch, type Handler } from "./helpers/mock-fetch";
@@ -14,8 +14,8 @@ function binaryResponse(): Response {
     return new Response(BYTES, { status: 200, headers: { "content-type": "application/octet-stream", "x-request-id": REQ_ID } });
 }
 
-describe("inference.run: JSON payload (D5)", () => {
-    it("(a) the JSON body is unchanged byte for byte", async () => {
+describe("inference.run: JSON payload", () => {
+    it("the JSON body is unchanged byte for byte", async () => {
         const { client, mock } = setup(() => jsonResponse({ ok: true }));
         const result = await client.inference.run(MODEL_B, { inputs: "hello", options: { top_k: 2 }, flag: true }, { headers: { "X-Fixture": "1" } });
         const req = mock.last();
@@ -30,7 +30,7 @@ describe("inference.run: JSON payload (D5)", () => {
         expect(result).toEqual({ ok: true });
     });
 
-    it("(d) responseType \"json\" behaves like no option", async () => {
+    it("responseType \"json\" behaves like no option", async () => {
         const { client, mock } = setup(() => jsonResponse({ ok: true }));
         const result = await client.inference.run(MODEL_B, { inputs: "hello" }, { responseType: "json", headers: { "X-Fixture": "1" } });
         const req = mock.last();
@@ -44,8 +44,8 @@ describe("inference.run: JSON payload (D5)", () => {
     });
 });
 
-describe("inference.run: FormData payload (D5)", () => {
-    it("(b) a FormData payload is sent as it is, without a Content-Type set by the SDK", async () => {
+describe("inference.run: FormData payload", () => {
+    it("a FormData payload is sent as it is, without a Content-Type set by the SDK", async () => {
         const { client, mock } = setup(() => jsonResponse({ ok: true }));
         const form = new FormData();
         form.append("file", new Blob([BYTES]), "input.bin");
@@ -63,8 +63,8 @@ describe("inference.run: FormData payload (D5)", () => {
     });
 });
 
-describe("inference.run: binary answer (D5)", () => {
-    it("(c) responseType \"binary\" resolves with the Response, body unread, Accept */*", async () => {
+describe("inference.run: binary answer", () => {
+    it("responseType \"binary\" resolves with the Response, body unread, Accept */*", async () => {
         const { client, mock } = setup(() => binaryResponse());
         const response = await client.inference.run(MODEL_A, { input: "x" }, { responseType: "binary", headers: { "X-Fixture": "1" } });
         expect(response).toBeInstanceOf(Response);
@@ -83,7 +83,7 @@ describe("inference.run: binary answer (D5)", () => {
         expect(headerNames(req).sort()).toEqual(["accept", "authorization", "content-type", "user-agent", "x-fixture"]);
     });
 
-    it("(c) withResponse() of a binary answer carries the request id and the unread response", async () => {
+    it("withResponse() of a binary answer carries the request id and the unread response", async () => {
         const { client } = setup(() => binaryResponse());
         const { data, response, requestId } = await client.inference.run(MODEL_A, { input: "x" }, { responseType: "binary" }).withResponse();
         expect(data).toBe(response);
@@ -91,7 +91,7 @@ describe("inference.run: binary answer (D5)", () => {
         expect(response.bodyUsed).toBe(false);
     });
 
-    it("(c) a FormData payload with a binary answer", async () => {
+    it("a FormData payload with a binary answer", async () => {
         const { client, mock } = setup(() => binaryResponse());
         const form = new FormData();
         form.append("mode", "fast");
@@ -104,8 +104,8 @@ describe("inference.run: binary answer (D5)", () => {
     });
 });
 
-describe("inference.run: types (D5)", () => {
-    it("(e) explicit generics and the binary overload compile", () => {
+describe("inference.run: types", () => {
+    it("explicit generics and the binary overload compile", () => {
         const { client } = setup(() => jsonResponse({ ok: true }));
         const typed = client.inference.run<{ ok: boolean }, { input: string }>(MODEL_A, { input: "x" });
         expectTypeOf(typed).toEqualTypeOf<APIPromise<{ ok: boolean }>>();

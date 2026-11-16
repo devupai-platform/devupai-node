@@ -1,4 +1,4 @@
-// Transport: D6 (APIPromise / withResponse), D7 (retries), D8 (timeouts, signals), D9 (errors), D10 (User-Agent).
+// Transport: APIPromise / withResponse, retries, timeouts and signals, errors, User-Agent.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -56,7 +56,7 @@ afterEach(() => {
     vi.useRealTimers();
 });
 
-describe("APIPromise and withResponse() (D6, block0 §3.9 items 9, 10)", () => {
+describe("APIPromise and withResponse()", () => {
     it("every resource method returns an APIPromise (a real Promise subclass with withResponse)", async () => {
         const { client, mock } = setup((req) => {
             const accept = req.headers.get("accept");
@@ -144,7 +144,7 @@ describe("APIPromise and withResponse() (D6, block0 §3.9 items 9, 10)", () => {
     });
 });
 
-describe("retries (D7, block0 §3.9 item 8)", () => {
+describe("retries", () => {
     beforeEach(() => {
         vi.spyOn(Math, "random").mockReturnValue(0); // full jitter → no wait
     });
@@ -320,7 +320,7 @@ describe("retries (D7, block0 §3.9 item 8)", () => {
     });
 });
 
-describe("timeouts and signals (D8, block0 §3.9 item 7)", () => {
+describe("timeouts and signals", () => {
     it("an already-aborted signal rejects with its reason before any fetch", async () => {
         const { client, mock } = setup(() => jsonResponse(COMPLETION));
         const controller = new AbortController();
@@ -437,7 +437,7 @@ describe("timeouts and signals (D8, block0 §3.9 item 7)", () => {
     });
 });
 
-describe("errors (D9, block0 §3.9 item 9)", () => {
+describe("errors", () => {
     it.each([
         [400, "DevupAPIError"],
         [401, "AuthenticationError"],
@@ -514,7 +514,7 @@ describe("errors (D9, block0 §3.9 item 9)", () => {
     });
 });
 
-describe("API key and header values (m1)", () => {
+describe("API key and header values", () => {
     const NUL = String.fromCharCode(0);
     const KEY_MESSAGE = "apiKey contains characters that are not allowed in an HTTP header.";
     const headerMessage = (name: string): string => `Header "${name}" has a value that is not allowed in an HTTP header.`;
@@ -636,7 +636,7 @@ describe("onDebug hook errors", () => {
     });
 });
 
-describe("User-Agent (D10, block0 §3.9 item 11)", () => {
+describe("User-Agent", () => {
     it("sends User-Agent: devupai-node/<package.json version> on every request", async () => {
         const { client, mock } = setup(() => jsonResponse({ object: "list", data: [] }));
         await client.models.list();

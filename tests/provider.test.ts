@@ -1,4 +1,4 @@
-// D4 — the `devupai/ai` integration with ai@7, against a recording fetch. No network.
+// The `devupai/ai` integration with ai@7, against a recording fetch. No network.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -33,7 +33,7 @@ function expectCommonHeaders(req: RecordedRequest | undefined): void {
     expect(req!.headers.get("user-agent") ?? "").toMatch(new RegExp(`^devupai-node/${SDK_VERSION.replace(/\./g, "\\.")}(\\s|$)`));
 }
 
-describe("devupai/ai with ai@7 (D4, block0 §3.9 item 14)", () => {
+describe("devupai/ai with ai@7", () => {
     const saved = { a: process.env.DEVUP_API_KEY, b: process.env.DEVUPAI_API_KEY };
 
     beforeAll(() => {

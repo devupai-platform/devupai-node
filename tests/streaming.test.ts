@@ -1,4 +1,4 @@
-// D5 (one chunk type, usage on the final chunk, error frames, malformed frames) and the SSE parser.
+// Chat streams (one chunk type, usage on the final chunk, error frames, malformed frames) and the SSE parser.
 import { describe, it, expect, vi } from "vitest";
 import DevupAI, { APIConnectionError, APITimeoutError, DevupAPIError, Stream, type ChatCompletionChunk, type DebugEvent } from "../src/index";
 import { SSEParser, type ServerSentEvent } from "../src/core/streaming";
@@ -31,7 +31,7 @@ async function collect<T>(stream: AsyncIterable<T>): Promise<T[]> {
 
 const params = { model: MODEL_A, messages: [{ role: "user" as const, content: "Hi" }], stream: true as const };
 
-describe("chat stream (D5, block0 §3.9 items 2, 3, 4, 6)", () => {
+describe("chat stream", () => {
     it("sends stream and stream_options in the body, and yields the real shape with usage on the final chunk", async () => {
         const { client, mock } = setup(() => sseResponse(realChatStream()));
         const stream = await client.chat.completions.create({ ...params, stream_options: { include_usage: true } });
@@ -57,7 +57,7 @@ describe("chat stream (D5, block0 §3.9 items 2, 3, 4, 6)", () => {
         expect(chunks.some((c) => c._devup !== undefined)).toBe(false);
     });
 
-    it("exposes response, requestId and warnings on the stream (D6)", async () => {
+    it("exposes response, requestId and warnings on the stream", async () => {
         const { client } = setup(() => sseResponse(realChatStream(), { headers: { "x-devup-warnings": "fixture_notice_a, fixture_notice_b" } }));
         const stream = await client.chat.completions.create(params);
         expect(stream.response).toBeInstanceOf(Response);
@@ -67,7 +67,7 @@ describe("chat stream (D5, block0 §3.9 items 2, 3, 4, 6)", () => {
         await collect(stream);
     });
 
-    it("withResponse() on a stream gives the request id before reading the body (D6, §3.9 item 10)", async () => {
+    it("withResponse() on a stream gives the request id before reading the body", async () => {
         const { client } = setup(() => sseResponse(realChatStream()));
         const { data, response, requestId, warnings } = await client.chat.completions.create(params).withResponse();
         expect(data).toBeInstanceOf(Stream);
@@ -351,7 +351,7 @@ describe("onDebug hook errors in a stream", () => {
     });
 });
 
-describe("stream timeouts (D8)", () => {
+describe("stream timeouts", () => {
     it("the request timeout covers only the time until headers, not the whole stream", async () => {
         const { client } = setup(() => sseResponse([...realChatStream()], { delayMs: 40 }), { timeout: 60 });
         const chunks = await collect(await client.chat.completions.create(params));

@@ -122,7 +122,7 @@ describe("DEVUP AI SDK 4.x - Black-box Tests", () => {
         });
     });
 
-    describe("Authorization (block0 §3.9 item 1)", () => {
+    describe("Authorization", () => {
         it("models.list sends Authorization: Bearer <apiKey>", async () => {
             await client.models.list();
             const req = mock.last();

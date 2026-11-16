@@ -1,4 +1,4 @@
-// D8: conditional requests on `models.list` / `models.retrieve` (`If-None-Match` → 304 Not Modified).
+// Conditional requests on `models.list` / `models.retrieve` (`If-None-Match` → 304 Not Modified).
 import { describe, expect, expectTypeOf, it } from "vitest";
 import DevupAI, { DevupAPIError, type APIPromise, type ConditionalRequestOptions, type ModelListResponse, type ModelObject, type RequestOptions } from "../src/index";
 import { BASE, MODEL_A, REQ_ID, TEST_KEY, jsonResponse, mockFetch, type Handler } from "./helpers/mock-fetch";
@@ -18,7 +18,7 @@ function notModified(): Response {
 const LIST: ModelListResponse = { object: "list", data: [] };
 const MODEL = { id: MODEL_A, object: "model", owned_by: "fixture" } as unknown as ModelObject;
 
-describe("models.list with ifNoneMatch (D8)", () => {
+describe("models.list with ifNoneMatch", () => {
     it("sends If-None-Match and resolves null on 304", async () => {
         const { client, mock } = setup(() => notModified());
         const result = await client.models.list({ ifNoneMatch: ETAG });
@@ -84,7 +84,7 @@ describe("models.list with ifNoneMatch (D8)", () => {
     });
 });
 
-describe("models.retrieve with ifNoneMatch (D8)", () => {
+describe("models.retrieve with ifNoneMatch", () => {
     it("sends If-None-Match and resolves null on 304", async () => {
         const { client, mock } = setup(() => notModified());
         const result = await client.models.retrieve(MODEL_A, { ifNoneMatch: ETAG });
@@ -140,7 +140,7 @@ function typeChecks(client: DevupAI): void {
     void widened;
 }
 
-describe("ConditionalRequestOptions typing (D8)", () => {
+describe("ConditionalRequestOptions typing", () => {
     it("the compile-only checks are part of this file", () => {
         expect(typeof typeChecks).toBe("function");
     });

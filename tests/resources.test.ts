@@ -1,4 +1,4 @@
-// D11: every method's URL, method, auth and body; the new and fixed methods (block0 §3.9 items 5, 12).
+// Every method's URL, method, auth and body; the new and fixed methods.
 import { describe, expect, it } from "vitest";
 import DevupAI, {
     DevupAPIError,
@@ -50,7 +50,7 @@ function sseEvent(event: string | null, data: unknown): string {
     return `${event ? `event: ${event}\n` : ""}data: ${JSON.stringify(data)}\n\n`;
 }
 
-describe("models (D11, defect 1)", () => {
+describe("models", () => {
     it("models.list(): GET /models with the Bearer key", async () => {
         const { client, mock } = setup(() => jsonResponse({ object: "list", data: [] }));
         const list = await client.models.list();
@@ -87,7 +87,7 @@ describe("models (D11, defect 1)", () => {
     });
 });
 
-describe("responses.create (D11, §3.9 item 12)", () => {
+describe("responses.create", () => {
     it("JSON: POST /responses with the body, returns the response object", async () => {
         const { client, mock } = setup(() => jsonResponse(RESPONSE));
         const result = await client.responses.create({ model: MODEL_A, input: "Hi", max_output_tokens: 16 });
@@ -170,11 +170,11 @@ describe("responses.create (D11, §3.9 item 12)", () => {
     });
 });
 
-describe("images.download (D11, D18, §3.9 item 5)", () => {
+describe("images.download", () => {
     const signed = `${BASE}/images/proxy?d=fixture-token&s=fixture-signature`;
     const REJECTED_MESSAGE = "images.download only fetches URLs returned by the API.";
 
-    it("replaces the 3.x method, with no alias (D18)", () => {
+    it("replaces the 3.x method, with no alias", () => {
         const { client } = setup(() => new Response("x"));
         expect(typeof client.images.download).toBe("function");
         // `in` also looks through the prototype chain.
@@ -223,13 +223,13 @@ describe("images.download (D11, D18, §3.9 item 5)", () => {
         expect(mock.calls).toHaveLength(0);
     });
 
-    // m6: a URL on the right origin that carries credentials is rejected too, and the
+    // A URL on the right origin that carries credentials is rejected too, and the
     // error never repeats the URL (so the credentials cannot leak into logs).
     it.each([
         ["username and password", "https://fixture-user:fixture-secret@api.devupai.com/v1/images/proxy?d=a&s=b", ["fixture-user", "fixture-secret"]],
         ["username only", "https://fixture-user@api.devupai.com/v1/images/proxy?d=a&s=b", ["fixture-user"]],
         ["password only", "https://:fixture-secret@api.devupai.com/v1/images/proxy?d=a&s=b", ["fixture-secret"]],
-    ])("rejects a URL with %s before any fetch, without echoing the credentials (m6)", async (_label, url, secrets) => {
+    ])("rejects a URL with %s before any fetch, without echoing the credentials", async (_label, url, secrets) => {
         const { client, mock } = setup(() => new Response("x"));
         const err = await client.images.download(url).catch((e: unknown) => e);
         expect(err).toBeInstanceOf(DevupAPIError);
@@ -253,7 +253,7 @@ describe("images.download (D11, D18, §3.9 item 5)", () => {
     });
 });
 
-describe("fixed shapes (D11)", () => {
+describe("fixed shapes", () => {
     it("rerank without return_documents sends no return_documents key", async () => {
         const { client, mock } = setup(() => jsonResponse({ object: "list", model: MODEL_B, results: [{ index: 0, relevance_score: 0.5 }], _devup: { cost_dzd: 1, balance_dzd: 2 } }));
         const result = await client.rerank.create({ model: MODEL_B, query: "q", documents: ["a", "b"] });
@@ -305,7 +305,7 @@ describe("fixed shapes (D11)", () => {
     });
 });
 
-describe("other methods: URL, method and auth (D11)", () => {
+describe("other methods: URL, method and auth", () => {
     it("video.generations.create: POST /video/generations JSON", async () => {
         const { client, mock } = setup(() => jsonResponse({ data: [{ url: "https://example.com/v.mp4" }], _devup: { cost_dzd: 1, balance_dzd: 2 } }));
         await client.video.generations.create({ model: MODEL_A, prompt: "a boat", response_format: "url" });

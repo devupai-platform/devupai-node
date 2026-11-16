@@ -1,4 +1,4 @@
-// D6: the extra transcription fields (`prompt`, `temperature`, `timestamp_granularities`) as form parts.
+// The extra transcription fields (`prompt`, `temperature`, `timestamp_granularities`) as form parts.
 import { describe, expect, it } from "vitest";
 import DevupAI from "../src/index";
 import { BASE, MODEL_A, TEST_KEY, jsonResponse, mockFetch, type Handler } from "./helpers/mock-fetch";
@@ -18,7 +18,7 @@ function partNames(form: FormData): string[] {
     return names;
 }
 
-describe("transcriptions extras (D6)", () => {
+describe("transcriptions extras", () => {
     it("sends prompt, temperature and one timestamp_granularities[] part per value", async () => {
         const { client, mock } = setup(() => jsonResponse({ text: "x", _devup: { cost_dzd: 1, balance_dzd: 2 } }));
         await client.audio.transcriptions.create({

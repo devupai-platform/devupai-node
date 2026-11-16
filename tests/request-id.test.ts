@@ -1,4 +1,4 @@
-// D7: the `x-client-request-id` response header on `withResponse()` and on `DevupAPIError`.
+// The `x-client-request-id` response header on `withResponse()` and on `DevupAPIError`.
 import { describe, expect, it } from "vitest";
 import DevupAI, { DevupAPIError, type WithResponse } from "../src/index";
 import { MODEL_A, REQ_ID, REQ_ID_2, TEST_KEY, errorResponse, jsonResponse, mockFetch, realChatStream, sseResponse, type Handler } from "./helpers/mock-fetch";
@@ -12,7 +12,7 @@ function setup(handler: Handler) {
     return { mock, client };
 }
 
-describe("x-client-request-id (D7)", () => {
+describe("x-client-request-id", () => {
     it("withResponse() exposes clientRequestId from the header; requestId is unchanged", async () => {
         const { client, mock } = setup(() =>
             jsonResponse({ object: "list", data: [] }, { headers: { "x-request-id": REQ_ID_2, "x-client-request-id": CLIENT_ID } }),

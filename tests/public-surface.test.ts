@@ -1,4 +1,4 @@
-// D2 (vendored spec + generated types in sync), D10 (no literal version in src), D13/D16 (public text checks).
+// Vendored spec and generated types in sync, no literal version in src, and the public text and model id checks.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -22,7 +22,7 @@ function listFiles(dir: string, ext: RegExp): string[] {
 
 const rel = (file: string): string => path.relative(ROOT, file).split(path.sep).join("/");
 
-describe("vendored spec and generated types (D2, block0 §3.9 item 13)", () => {
+describe("vendored spec and generated types", () => {
     it("openapi/SPEC_SHA256 is the sha256 of openapi/devupai-v1.yaml", () => {
         const bytes = readFileSync(path.join(ROOT, "openapi", "devupai-v1.yaml"));
         const recorded = readFileSync(path.join(ROOT, "openapi", "SPEC_SHA256"), "utf8");
@@ -54,7 +54,7 @@ describe("vendored spec and generated types (D2, block0 §3.9 item 13)", () => {
     }, 60_000);
 });
 
-describe("version (D10)", () => {
+describe("version", () => {
     it("src/ contains no literal copy of the package version", () => {
         const hits = listFiles(path.join(ROOT, "src"), /\.ts$/).filter((f) => {
             const text = readFileSync(f, "utf8");
@@ -69,7 +69,7 @@ describe("version (D10)", () => {
  * Hashes, so that this public file does not itself list the terms.
  */
 const FORBIDDEN_TERM_HASHES = new Set([
-    // Wording rules of the SDK documentation and the error codes that are not public (D16).
+    // Wording rules of the SDK documentation and the error codes that are not public.
     "4ea5ee68fea05586",
     "a74e503354fdd464",
     "1581e27de87bffae",
@@ -86,7 +86,7 @@ const FORBIDDEN_TERM_HASHES = new Set([
     "09c27ea4804eaf5d",
     "fa324adb1d7b75dc",
     "0f0942ba21c6b8c4",
-    // The D16 review word list, with inflections (comments avoid the words themselves).
+    // The review word list, with inflections (comments avoid the words themselves).
     // Keeping stored copies of responses: 4 forms.
     "5e1ecee06a7fc06f",
     "efbe9d5743db5752",
@@ -143,10 +143,10 @@ const AI_ENTRY_FILE = ["src/provider.ts"];
  */
 const ALLOWED_TEXT: AllowedText[] = [
     // URLs and names that are part of the public API.
-    { text: "/images/proxy", why: "URL path of the generated-file endpoint; D18 keeps it in URL literals" },
+    { text: "/images/proxy", why: "URL path of the generated-file endpoint, kept in URL literals" },
     { text: "proxyImage", files: SCHEMA_FILE, why: "operation id of that endpoint in the vendored spec" },
-    { text: "images.proxy", files: ["tests/types.test.ts", "MIGRATION_V3_TO_V4.md", "CHANGELOG.md", /^docs\/v3\/[^/]+\.md$/], why: "the 3.x method name: migration notes, 3.x history, and the type test that checks it is gone (D18)" },
-    { text: '"proxy" in client.images', files: ["tests/resources.test.ts"], why: "the runtime check that the 3.x method name is gone (D18)" },
+    { text: "images.proxy", files: ["tests/types.test.ts", "MIGRATION_V3_TO_V4.md", "CHANGELOG.md", /^docs\/v3\/[^/]+\.md$/], why: "the 3.x method name: migration notes, 3.x history, and the type test that checks it is gone" },
+    { text: '"proxy" in client.images', files: ["tests/resources.test.ts"], why: "the runtime check that the 3.x method name is gone" },
     { text: "settlement:", why: "field name of the webhook payloads" },
     { text: ".settlement", why: "the same webhook field, read from an event" },
     { text: '"settled"', why: "a value of that webhook field" },
@@ -216,7 +216,7 @@ function publicFiles(): string[] {
     return files;
 }
 
-describe("public text (D16)", () => {
+describe("public text", () => {
     it("the self-check hashes the way the list was built", () => {
         expect(termHash("Example")).toBe(termHash("example"));
         expect(words("fooBar baz-qux")).toEqual(expect.arrayContaining(["fooBar", "foo", "Bar", "baz-qux", "baz", "qux"]));
@@ -246,7 +246,7 @@ describe("public text (D16)", () => {
         expect(checked).toContain(SELF);
     });
 
-    it("no word of the D16 lists (wording rules and review words) and no non-public error code in src, tests, scripts, docs/v3, README, CHANGELOG, migration notes, package.json or CI, outside the commented exception list", () => {
+    it("no word of the wording-rule and review lists and no non-public error code in src, tests, scripts, docs/v3, README, CHANGELOG, migration notes, package.json or CI, outside the commented exception list", () => {
         const hits: string[] = [];
         for (const file of publicFiles()) {
             const name = rel(file);
@@ -260,7 +260,7 @@ describe("public text (D16)", () => {
     });
 });
 
-describe("model ids (D13)", () => {
+describe("model ids", () => {
     it("tests and hand-written src use only synthetic ids or placeholders as model values", () => {
         const files = [
             ...listFiles(path.join(ROOT, "tests"), /\.ts$/),

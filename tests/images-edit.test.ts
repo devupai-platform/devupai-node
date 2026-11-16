@@ -1,4 +1,4 @@
-// D2: images.edit() posts to /images/edits, as JSON when every input image is a URL or data URI,
+// images.edit() posts to /images/edits, as JSON when every input image is a URL or data URI,
 // as multipart/form-data when at least one input is a file. The form follows the params object.
 import { describe, expect, it } from "vitest";
 import DevupAI, { type ImageEditJsonParams, type ImageEditParams, type ImageGenerateResponse } from "../src/index";
@@ -31,7 +31,7 @@ async function partText(part: FormDataEntryValue | null): Promise<string> {
 }
 
 describe("images.edit(): multipart form (a file among the inputs)", () => {
-    it("(a) posts a FormData to /images/edits with the Bearer key; the Content-Type is left to the runtime", async () => {
+    it("posts a FormData to /images/edits with the Bearer key; the Content-Type is left to the runtime", async () => {
         const { client, mock } = setup();
         await client.images.edit({ model: MODEL_A, prompt: "Add a hat", image: new Blob(["img"]) });
         const req = mock.last();
@@ -45,7 +45,7 @@ describe("images.edit(): multipart form (a file among the inputs)", () => {
         expect(req.form!.get("prompt")).toBe("Add a hat");
     });
 
-    it("(b) every typed field reaches the form: scalars as text, mask and markup as file parts", async () => {
+    it("every typed field reaches the form: scalars as text, mask and markup as file parts", async () => {
         const { client, mock } = setup();
         const params: ImageEditParams = {
             model: MODEL_A,
@@ -104,7 +104,7 @@ describe("images.edit(): multipart form (a file among the inputs)", () => {
         expect([...names].sort()).toEqual([...Object.keys(texts), "image", "mask", "markup"].sort());
     });
 
-    it("(c) markup given as text is a text part", async () => {
+    it("markup given as text is a text part", async () => {
         const { client, mock } = setup();
         await client.images.edit({ model: MODEL_A, prompt: "p", image: new Blob(["img"]), markup: "https://example.com/marks.png" });
         const form = mock.last().form!;
@@ -112,7 +112,7 @@ describe("images.edit(): multipart form (a file among the inputs)", () => {
         expect(form.has("mask")).toBe(false);
     });
 
-    it("(d) several images give one `image` part each, in order", async () => {
+    it("several images give one `image` part each, in order", async () => {
         const { client, mock } = setup();
         await client.images.edit({ model: MODEL_A, prompt: "p", image: [new Blob(["first"]), new Blob(["second"])] });
         const form = mock.last().form!;
@@ -123,7 +123,7 @@ describe("images.edit(): multipart form (a file among the inputs)", () => {
         expect(await Promise.all(parts.map(partText))).toEqual(["first", "second"]);
     });
 
-    it("(g) a file among text images sends multipart; the text images are text parts, `{ image_url }` its string", async () => {
+    it("a file among text images sends multipart; the text images are text parts, `{ image_url }` its string", async () => {
         const { client, mock } = setup();
         // `{ image_url }` is typed for the JSON form only; the runtime rule still maps it to its string.
         const params = { model: MODEL_A, prompt: "p", image: [new Blob(["file"]), PNG_URL, { image_url: PNG_DATA_URI }] } as unknown as ImageEditParams;
@@ -138,7 +138,7 @@ describe("images.edit(): multipart form (a file among the inputs)", () => {
         expect(parts[2]).toBe(PNG_DATA_URI);
     });
 
-    it("(h) request options inside params are not form parts", async () => {
+    it("request options inside params are not form parts", async () => {
         const { client, mock } = setup();
         await client.images.edit({ model: MODEL_A, prompt: "p", image: new Blob(["img"]), timeout: 5_000 });
         const form = mock.last().form!;
@@ -150,7 +150,7 @@ describe("images.edit(): multipart form (a file among the inputs)", () => {
 });
 
 describe("images.edit(): JSON form (every input a URL or data URI)", () => {
-    it("(e) `images` as strings and `{ image_url }` objects: the params are sent as JSON, byte for byte", async () => {
+    it("`images` as strings and `{ image_url }` objects: the params are sent as JSON, byte for byte", async () => {
         const { client, mock } = setup();
         const params: ImageEditJsonParams = {
             model: MODEL_A,
@@ -169,7 +169,7 @@ describe("images.edit(): JSON form (every input a URL or data URI)", () => {
         expect(req.text).toBe(JSON.stringify(params));
     });
 
-    it("(f) `image` as one string", async () => {
+    it("`image` as one string", async () => {
         const { client, mock } = setup();
         const params: ImageEditJsonParams = { model: MODEL_A, prompt: "p", image: PNG_URL, markup: "https://example.com/marks.png" };
         await client.images.edit(params);
@@ -179,7 +179,7 @@ describe("images.edit(): JSON form (every input a URL or data URI)", () => {
         expect(req.json).toEqual(params);
     });
 
-    it("(h) request options inside params are not sent in the JSON body", async () => {
+    it("request options inside params are not sent in the JSON body", async () => {
         const { client, mock } = setup();
         await client.images.edit({ model: MODEL_A, prompt: "p", images: [PNG_URL], timeout: 5_000 });
         const req = mock.last();
@@ -188,7 +188,7 @@ describe("images.edit(): JSON form (every input a URL or data URI)", () => {
 });
 
 describe("images.edit(): response", () => {
-    it("(i) resolves to the parsed ImageGenerateResponse in both forms", async () => {
+    it("resolves to the parsed ImageGenerateResponse in both forms", async () => {
         const { client } = setup();
         const fromForm = await client.images.edit({ model: MODEL_A, prompt: "p", image: new Blob(["img"]) });
         expect(fromForm.data[0]!.url).toBe(RESULT.data[0]!.url);

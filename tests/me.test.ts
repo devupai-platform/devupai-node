@@ -1,4 +1,4 @@
-// D4: the account profile resource (`GET /me`, `GET /me/avatar`).
+// The account profile resource (`GET /me`, `GET /me/avatar`).
 import { describe, expect, it } from "vitest";
 import DevupAI, { NotFoundError, type AccountProfile } from "../src/index";
 import { BASE, REQ_ID, TEST_KEY, errorResponse, jsonResponse, mockFetch, type Handler } from "./helpers/mock-fetch";
@@ -28,7 +28,7 @@ function avatarResponse(): Response {
     });
 }
 
-describe("me.retrieve (D4)", () => {
+describe("me.retrieve", () => {
     it("GET /me with the Bearer key and Accept: application/json; resolves with the profile", async () => {
         const { client, mock } = setup(() => jsonResponse(PROFILE, { headers: { "Cache-Control": "private, max-age=300" } }));
         const profile = await client.me.retrieve();
@@ -51,7 +51,7 @@ describe("me.retrieve (D4)", () => {
     });
 });
 
-describe("me.avatar (D4, D8)", () => {
+describe("me.avatar", () => {
     it("GET /me/avatar with the Bearer key; resolves with the Response, body unread", async () => {
         const { client, mock } = setup(() => avatarResponse());
         const response = await client.me.avatar();
