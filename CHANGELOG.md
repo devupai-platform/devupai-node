@@ -3,6 +3,83 @@
 All notable changes to the `devupai` package are listed here. Earlier 3.x
 entries are in [docs/v3/CHANGELOG_V3.md](https://github.com/devupai-platform/devupai-node/blob/main/docs/v3/CHANGELOG_V3.md).
 
+## [4.2.0]
+
+No breaking changes to method signatures. Retries on billed requests are
+narrower; see "Changed". HTTP 400, 402, 413 and 422 errors are now instances
+of their own `DevupAPIError` subclasses, so their `name` is the subclass name.
+The image request types accept any extra key, so a misspelled option name
+compiles and is sent as is.
+
+### Added
+
+- `image_params` on `ModelObject`, from `client.models.list()` and
+  `client.models.retrieve(id)`: a model's image options with the values they
+  take, the image endpoints it is served on, the input images an edit takes,
+  the mask format, and its prompt rule. New types `ImageParams`,
+  `ImageParamsOption`, and `ImageParamsInputs`.
+- `client.images.generate()` and `client.images.edit()` accept, without a
+  type error, the options of a model's own that it lists in
+  `image_params.options`, under their own name (their values are typed
+  `unknown`; `image_params` describes them). A structured value (a list or an
+  object) is sent as a JSON value, and as one JSON field in
+  `multipart/form-data`. `ImageEditParams` keeps `model` required.
+- Error subclasses `BadRequestError` (400), `PaymentRequiredError` (402),
+  `PayloadTooLargeError` (413), and `UnprocessableEntityError` (422). All
+  extend `DevupAPIError`; the existing classes and `instanceof` checks are
+  unchanged. `error.code` names the reason, for example
+  `missing_required_parameter` or `payload_too_large`.
+- `npm run sync:spec -- --from <path>` copies the API description from the
+  given file.
+
+### Changed
+
+- Retries of the `DevupAI` client on billed requests (chat completions,
+  Responses, embeddings, rerank, `images.generate()`, `images.edit()`, speech,
+  transcriptions, video, and `inference.run()`): only 429 and 503 answers,
+  with `Retry-After` honoured, and a connection that could not be opened are
+  retried. A 408, 502 or 504 answer, or a connection lost after the request
+  may have been sent, is returned to the caller, because the request may
+  already have been processed and charged. Other requests keep the previous
+  retries. `maxRetries` is unchanged, and `maxRetries: 0` still turns retries
+  off. Calls made through `devupai/ai` keep the AI SDK's own retries; the
+  README shows how to turn them off.
+- The bundled API description and the generated types match the current API:
+  - options of a model's own, and `image_params` on the model object;
+  - HTTP 400 `missing_required_parameter` for a required option, image, or
+    mask;
+  - prompt rules per model: no prompt, an optional prompt, and a longest
+    prompt counted in Unicode code points (an emoji counts as one);
+  - input image limits per model, mask formats (`alpha`, `black_and_white`),
+    and models that need a mask;
+  - HTTP 400 `content_policy_violation` on both image endpoints, not charged;
+  - HTTP 413 `payload_too_large` on embeddings, rerank, Responses, and
+    transcriptions above 10,485,760 bytes (10 MiB);
+  - HTTP 404 `reference_audio_not_found` on speech, for a reference clip that
+    is not one of this account's clips;
+  - HTTP 404 `model_not_found` for a model string that is malformed or longer
+    than 200 characters;
+  - HTTP 400 `invalid_value` for a multipart image field sent more than once.
+
+### Fixed
+
+- The README native inference example uses `"<model-id>"` and names the model
+  types that endpoint serves, instead of an embeddings model.
+- An `If-None-Match` header given in `headers` on a `GET` call gets the same
+  result on a 304 Not Modified as `ifNoneMatch` (`null`, or the 304 `Response`
+  for a method that returns a `Response`), instead of throwing.
+
+### Docs
+
+- README sections on model options and `image_params`, request size limits,
+  retries and `Retry-After`, notice codes (`X-DEVUP-Warnings`) and messages
+  (`_devup.warnings`), the `usage` chunk that ends every chat completion
+  stream, the HTTP 403 of an expired generated-file link (generate the file
+  again), the free sizes of `black-forest-labs/FLUX-1-schnell`, the new error
+  classes, and the API behaviour since 4.1.0.
+- The README states that new enum values may be added; the enum types stay as
+  they are in this release.
+
 ## [4.1.0]
 
 No breaking changes.

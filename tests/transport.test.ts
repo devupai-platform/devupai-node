@@ -163,9 +163,9 @@ describe("retries", () => {
         expect(b!.headers.get("authorization")).toBe(`Bearer ${TEST_KEY}`);
     });
 
-    it.each([408, 429, 502, 503, 504])("retries status %i (up to maxRetries = 2 by default)", async (status) => {
+    it.each([408, 429, 502, 503, 504])("retries status %i on a GET (up to maxRetries = 2 by default)", async (status) => {
         const { client, mock, retries } = setup(() => errorResponse(status, "fixture_capacity"));
-        const err = await client.chat.completions.create(CHAT).catch((e: unknown) => e);
+        const err = await client.balance.retrieve().catch((e: unknown) => e);
         expect(err).toBeInstanceOf(DevupAPIError);
         expect((err as DevupAPIError).status).toBe(status);
         expect(mock.calls).toHaveLength(3);
@@ -190,9 +190,9 @@ describe("retries", () => {
         expect(retries()).toEqual([]);
     });
 
-    it("retries a connection error before any response", async () => {
-        const { client, mock, retries } = setup(sequence(new TypeError("fetch failed"), jsonResponse(COMPLETION)));
-        await expect(client.chat.completions.create(CHAT)).resolves.toStrictEqual(COMPLETION);
+    it("retries a connection error before any response on a GET", async () => {
+        const { client, mock, retries } = setup(sequence(new TypeError("fetch failed"), jsonResponse({ balance_dzd: 1 })));
+        await expect(client.balance.retrieve()).resolves.toStrictEqual({ balance_dzd: 1 });
         expect(mock.calls).toHaveLength(2);
         expect(retries()).toEqual([{ attempt: 1, status: 0, waitMs: 0 }]);
     });
@@ -439,7 +439,7 @@ describe("timeouts and signals", () => {
 
 describe("errors", () => {
     it.each([
-        [400, "DevupAPIError"],
+        [400, "BadRequestError"],
         [401, "AuthenticationError"],
         [403, "PermissionDeniedError"],
         [404, "NotFoundError"],
@@ -492,7 +492,7 @@ describe("errors", () => {
         expect(makeAPIError(429, "m", undefined, h)).toBeInstanceOf(RateLimitError);
         expect(makeAPIError(500, "m", undefined, h)).toBeInstanceOf(InternalServerError);
         expect(makeAPIError(504, "m", undefined, h)).toBeInstanceOf(InternalServerError);
-        const plain = makeAPIError(400, "m", { code: "fixture_invalid", param: "model" }, h);
+        const plain = makeAPIError(418, "m", { code: "fixture_invalid", param: "model" }, h);
         expect(plain.constructor).toBe(DevupAPIError);
         expect(plain.param).toBe("model");
         expect(plain.requestId).toBe(REQ_ID);
@@ -617,8 +617,8 @@ describe("onDebug hook errors", () => {
         const onDebug = vi.fn<(e: DebugEvent) => void>(() => {
             throw new Error("fixture hook error");
         });
-        const { client, mock } = setup(sequence(new TypeError("fetch failed"), jsonResponse(COMPLETION)), { onDebug });
-        await expect(client.chat.completions.create(CHAT)).resolves.toStrictEqual(COMPLETION);
+        const { client, mock } = setup(sequence(new TypeError("fetch failed"), jsonResponse({ balance_dzd: 1 })), { onDebug });
+        await expect(client.balance.retrieve()).resolves.toStrictEqual({ balance_dzd: 1 });
         expect(mock.calls).toHaveLength(2);
         expect(onDebug).toHaveBeenCalledWith({ type: "retry", detail: { attempt: 1, status: 0, waitMs: 0 } });
     });

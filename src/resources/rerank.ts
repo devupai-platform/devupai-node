@@ -1,4 +1,4 @@
-import type { RequestOptions } from "../core/client";
+import { BILLED_POST_RETRY, type RequestOptions } from "../core/client";
 import type { APIPromise } from "../core/api-promise";
 import type { RerankCreateParams, RerankCreateResponse } from "../types";
 import { APIResource, prepareRequest } from "./shared";
@@ -28,6 +28,7 @@ export class Rerank extends APIResource {
             body,
             auth: true,
             options: requestOptions,
+            retry: BILLED_POST_RETRY,
         });
     }
 }

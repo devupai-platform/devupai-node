@@ -87,6 +87,7 @@ Upgrading from 3.x? Read [MIGRATION_V3_TO_V4.md](https://github.com/devupai-plat
   - [Reasoning Output](#reasoning-output)
   - [Responses API](#responses-api)
   - [Images](#images)
+  - [Model Options](#model-options)
   - [Downloading Generated Files](#downloading-generated-files)
   - [Embeddings](#embeddings)
   - [Reranking](#reranking)
@@ -102,6 +103,8 @@ Upgrading from 3.x? Read [MIGRATION_V3_TO_V4.md](https://github.com/devupai-plat
 - [Retries](#retries)
 - [Timeouts and Cancellation](#timeouts-and-cancellation)
 - [Error Handling](#error-handling)
+  - [Request Size Limits](#request-size-limits)
+- [API Behaviour Since 4.1.0](#api-behaviour-since-410)
 - [TypeScript](#typescript)
 - [Runtime and Security](#runtime-and-security)
 - [Models](#models)
@@ -262,8 +265,8 @@ to a `Stream<ChatCompletionChunk>` that you read with `for await`.
 
 - Every chunk is a `ChatCompletionChunk` with the same `id`.
 - When the model completes its reply, the **last chunk** has an empty
-  `choices` array and carries `usage`. Request it with
-  `stream_options: { include_usage: true }`.
+  `choices` array and carries `usage`. The API adds this chunk to every chat
+  completion stream, with or without `stream_options: { include_usage: true }`.
 - Chunks also carry the standard `service_tier` and `system_fingerprint`
   fields when the API returns them.
 - The stream exposes `stream.response`, `stream.requestId`, and
@@ -371,7 +374,8 @@ runReasoning().catch(console.error);
 ## Responses API
 
 `client.responses.create()` calls `POST /v1/responses`, the OpenAI-compatible
-Responses API.
+Responses API. The request body can be up to 10,485,760 bytes (10 MiB); see
+[Request Size Limits](#request-size-limits).
 
 ```typescript
 import DevupAI from "devupai";
@@ -456,6 +460,11 @@ async function generateImage() {
 generateImage().catch(console.error);
 ```
 
+`size` takes the sizes the model lists. On this model it is a free size: any
+width and height from 128 to 1920 pixels, default `1024x1024`. Every image
+model lists its sizes and other options in `image_params`; see
+[Model Options](#model-options).
+
 </details>
 
 <details>
@@ -526,7 +535,84 @@ async function editImageFromFiles() {
 editImageFromFiles().catch(console.error);
 ```
 
+Use the mask format the model lists in `image_params.inputs.mask_format`:
+`alpha` (a PNG whose transparent areas mark the part to edit) or
+`black_and_white` (white marks the part to edit, black the part to keep). See
+[Model Options](#model-options).
+
 </details>
+
+## Model Options
+
+Image models take different options. `client.models.list()` and
+`client.models.retrieve(id)` return them in `image_params` (type
+`ImageParams`) on each model that lists image options; the field is absent on
+other models. Field names and values are the ones a request sends.
+
+- `endpoints`: `generations`, `edits`, or both.
+- `options` (`ImageParamsOption[]`): each option's request `field` and what it
+  takes: `values`, `range`, `default`, `required`, `max_length`, and, for
+  `size`, `free` (the free sizes, for example `min_edge` and `max_edge`). An
+  option with a `kind` (`boolean`, `choice`, `int`, `decimal`, `text`, or
+  `structured`) is an option of the model's own, sent under its own name.
+- `inputs` (`ImageParamsInputs`): the input images an edit takes (`image.min`,
+  `image.max`, and, when listed, `roles`, `max_pixels`, and `max_edge`),
+  whether the model takes `mask` or `markup`, `mask_required` (every edit
+  needs a mask), `mask_max_images`, and `mask_format` (`alpha` or
+  `black_and_white`).
+- `prompt`: `none` (the model takes no prompt), `optional`, or absent (a
+  prompt is required). `prompt_max_length` is the longest prompt, counted in
+  Unicode code points: an emoji counts as one.
+
+`client.images.generate()` and `client.images.edit()` accept the options a
+model lists without a type error: send an option of the model's own under its
+`field` name (its value is typed `unknown`; `image_params` describes it). A `structured` value (a list or an object) is sent as a JSON value, and
+as one JSON field in `multipart/form-data`.
+
+```typescript
+import DevupAI from "devupai";
+
+const client = new DevupAI({
+  apiKey: process.env.DEVUP_API_KEY!,
+});
+
+async function generateWithModelOptions() {
+  const model = await client.models.retrieve("Qwen/Qwen-Image-Edit-Max");
+  const params = model.image_params;
+  if (!params) return;
+
+  console.log("Endpoints:", params.endpoints.join(", "));
+  for (const option of params.options) {
+    console.log(option.field, option.kind ?? "image option", {
+      values: option.values,
+      range: option.range,
+      default: option.default,
+      required: option.required ?? false,
+    });
+  }
+  console.log("Prompt:", params.prompt ?? "required", params.prompt_max_length);
+  console.log("Input images:", params.inputs?.image?.min, "to", params.inputs?.image?.max);
+  console.log("Mask format:", params.inputs?.mask_format ?? "not listed");
+
+  // prompt_extend is an option of this model's own (kind "boolean", default true).
+  const response = await client.images.generate({
+    model: "Qwen/Qwen-Image-Edit-Max",
+    prompt: "A watercolor map of the Algerian coast",
+    size: "1536x1024",
+    negative_prompt: "text, watermark",
+    prompt_extend: false,
+  });
+
+  console.log(response.data[0]?.url);
+}
+
+generateWithModelOptions().catch(console.error);
+```
+
+A value the model does not accept returns HTTP 400 `invalid_value`, and the
+message names what the model accepts. An option the model marks as
+`required`, left out, returns HTTP 400 `missing_required_parameter` before
+anything is charged. Both are thrown as `BadRequestError`.
 
 ---
 
@@ -542,6 +628,9 @@ native `Response`, so you can read its headers and binary body.
   "images.download only fetches URLs returned by the API." before a request is
   sent.
 - It does not send your API key.
+- A link returned by the API expires after a short period. Downloading an
+  expired link throws a `PermissionDeniedError` (HTTP 403): generate the image
+  or video again to get a new link.
 
 ```typescript
 import DevupAI from "devupai";
@@ -574,7 +663,10 @@ downloadImage().catch(console.error);
 ## Embeddings
 
 `embedding` is an array of numbers, or a base64 string when the request sets
-`encoding_format: "base64"`.
+`encoding_format: "base64"`. `input` takes up to 2,048 texts; a longer array
+returns HTTP 400 `payload_too_large`. The request body can be up to
+10,485,760 bytes (10 MiB); a larger body returns HTTP 413 `payload_too_large`
+(`PayloadTooLargeError`) and is not charged.
 
 ```typescript
 import DevupAI from "devupai";
@@ -602,7 +694,9 @@ createEmbeddings().catch(console.error);
 
 ## Reranking
 
-`return_documents` is optional.
+`return_documents` is optional. The request body can be up to 10,485,760
+bytes (10 MiB); a larger body returns HTTP 413 `payload_too_large`
+(`PayloadTooLargeError`) and is not charged.
 
 ```typescript
 import DevupAI from "devupai";
@@ -663,7 +757,9 @@ createSpeech().catch(console.error);
 `response_format` `json` and `verbose_json` return an object; `text`, `srt`, and
 `vtt` return a string. The request also accepts `prompt`, `temperature`, and,
 with `response_format: "verbose_json"`, `timestamp_granularities` (an array of
-`"word"` and `"segment"`).
+`"word"` and `"segment"`). The request body, the audio file included, can be
+up to 10,485,760 bytes (10 MiB); a larger body returns HTTP 413
+`payload_too_large` (`PayloadTooLargeError`) and is not charged.
 
 ```typescript
 import { readFile } from "node:fs/promises";
@@ -851,6 +947,12 @@ your application knows the shape. For a model that answers with a file, pass
 the request option `responseType: "binary"`: the call then resolves to the
 native `Response` with its body unread. The default is `"json"`.
 
+This endpoint serves models whose `type` (in `client.models.retrieve(id)`) is
+`text-generation`, `reranker`, or `zero-shot-image-classification`. Image,
+video, speech, transcription, and embeddings models use their own methods
+above; on this endpoint they return HTTP 400 `invalid_route`, and the message
+names the endpoint to use. Replace `<model-id>` with a model of one of these types.
+
 ```typescript
 import DevupAI from "devupai";
 
@@ -860,7 +962,7 @@ const client = new DevupAI({
 
 async function runInference() {
   const result = await client.inference.run<Record<string, unknown>>(
-    "BAAI/bge-m3",
+    "<model-id>",
     { input: "Hello from Algeria!" },
   );
 
@@ -946,7 +1048,12 @@ Both model calls accept the request option `ifNoneMatch: "<etag>"`, sent as
 `If-None-Match`. When the API answers 304 Not Modified, the call resolves to
 `null` (the result type becomes `ModelListResponse | null` or
 `ModelObject | null` for that call), and `withResponse()` gives the 304
-response with its `ETag` header.
+response with its `ETag` header. An `If-None-Match` header given in `headers`
+(client or request) gets the same result on a 304; only `ifNoneMatch` adds
+`null` to the result type.
+
+Image models also carry `image_params`, their image options; see
+[Model Options](#model-options).
 
 ```typescript
 import DevupAI from "devupai";
@@ -1145,6 +1252,12 @@ and `DevupAIModelData`, and the integration type as `DevupAIIntegration`.
 
 Streaming requests send `stream_options: { include_usage: true }`, so `usage`
 is available on `streamText` results.
+
+Retries of calls made through `devupai/ai` follow the AI SDK's own
+`maxRetries` setting (default 2), not the rule in [Retries](#retries). The AI
+SDK can retry a 408, 502 or 504 answer of a billed call, which may already
+have been processed and charged; pass `maxRetries: 0` to `generateText`,
+`streamText`, `generateImage`, `embed` or `embedMany` to send each call once.
 
 ## Generate text
 
@@ -1392,7 +1505,7 @@ method: `.withResponse()`. It resolves to:
 | `response`  | `Response`       | The HTTP response, with its status and headers.                     |
 | `requestId` | `string \| null` | The `x-request-id` header. Include it when you contact support.     |
 | `clientRequestId` | `string \| null` | The `x-client-request-id` header.                             |
-| `warnings`  | `string[]`       | Informational notices about how the request was handled.            |
+| `warnings`  | `string[]`       | Notice codes from the `X-DEVUP-Warnings` header (empty when none).  |
 
 ```typescript
 import DevupAI from "devupai";
@@ -1425,14 +1538,38 @@ Streams expose the same information directly: `stream.response`,
 `stream.requestId`, `stream.clientRequestId`, and `stream.warnings`. Errors carry `requestId`,
 `clientRequestId`, and `warnings` too.
 
-`warnings` comes from the `X-DEVUP-Warnings` response header. Notices are
-informational: the request was answered.
+`warnings` lists the notice codes of the `X-DEVUP-Warnings` response header,
+split at the commas (for example `parameter_not_supported`). The header is
+sent on streamed and non-streamed responses alike, and only when there is at
+least one notice. On chat completions and Responses without streaming, on
+video generation, and on image generation and edits with models that list
+image options, the body also lists each notice's message in
+`_devup.warnings`. The codes are stable: use
+them in your code, not the message text. Notices are informational: the
+request was answered.
 
 ---
 
 # Retries
 
-Transient errors (408, 429, 502, 503, 504, network) are retried with backoff; set `maxRetries` to change it.
+The `DevupAI` client retries a request up to `maxRetries` times (default 2).
+Calls made through `devupai/ai` follow the AI SDK's retries instead (see
+[Vercel AI SDK](#vercel-ai-sdk)). When the
+answer has a `Retry-After` header, the SDK waits that long before the next
+attempt; otherwise it waits a random time that grows with each attempt, up to
+60 seconds. A wait that does not fit in the remaining `timeout` ends the call
+with the error. A 500 answer is not retried.
+
+| Requests | Retried on |
+| -------- | ---------- |
+| Billed requests: chat completions, Responses, embeddings, rerank, `images.generate()`, `images.edit()`, speech, transcriptions, video generations and edits, `inference.run()` | 429 and 503, and a connection that could not be opened |
+| Other requests: models, balance, account profile and picture, health, `images.download()` | 408, 429, 502, 503, and 504, and connection errors |
+
+On billed requests, a 408, 502 or 504 answer, or a connection lost after the
+request may have been sent, is returned to you without a retry, because the
+request may already have been processed and charged. Earlier versions retried
+these on every request. `maxRetries` applies to both groups, and
+`maxRetries: 0` turns retries off.
 
 ```typescript
 import DevupAI from "devupai";
@@ -1510,15 +1647,28 @@ the HTTP status, so you can catch a specific case or the base class.
 
 | Class                   | Status      | Notes                                                              |
 | ----------------------- | ----------- | ------------------------------------------------------------------ |
+| `BadRequestError`       | 400         | The request is not valid as sent; `code` names the reason.         |
 | `AuthenticationError`   | 401         | Missing or invalid API key.                                        |
-| `PermissionDeniedError` | 403         | The key cannot use this resource.                                  |
+| `PaymentRequiredError`  | 402         | The balance does not cover the request (`insufficient_balance`), or a scoped credential reached its budget (`budget_exhausted`). |
+| `PermissionDeniedError` | 403         | The key cannot use this resource. From `images.download()`: the link has expired; generate the file again. |
 | `NotFoundError`         | 404         | For example, an unknown model.                                     |
 | `ConflictError`         | 409         | The request could not be completed. Retry later or contact support. |
+| `PayloadTooLargeError`  | 413         | The request body is larger than the limit (`payload_too_large`). See [Request Size Limits](#request-size-limits). |
+| `UnprocessableEntityError` | 422      | The request was not accepted in its current form.                  |
 | `RateLimitError`        | 429         | Read `retryAfterMs` for the suggested wait.                        |
 | `InternalServerError`   | 500 and up  | The request could not be completed. Retry later or contact support. |
 | `APIConnectionError`    | `0`         | The API could not be reached.                                      |
 | `APITimeoutError`       | `0`         | The call exceeded `timeout` or `streamIdleTimeout`. Extends `APIConnectionError`. |
-| `DevupAPIError`         | other       | Any other status, for example 400 or 402.                          |
+| `DevupAPIError`         | other       | Any other status, for example 415.                                 |
+
+`BadRequestError`, `PaymentRequiredError`, `PayloadTooLargeError`, and
+`UnprocessableEntityError` are new in 4.2.0. Like the other classes, they
+extend `DevupAPIError`, so existing `instanceof DevupAPIError` and
+`error.status` checks keep working. Match `error.code` for the specific
+reason, for example `missing_required_parameter`, `invalid_value`,
+`content_policy_violation`, or `context_length_exceeded` (400),
+`payload_too_large` (413), `model_at_capacity` (429), or
+`reference_audio_not_found` (404).
 
 | Property       | Type                     | Description                                                              |
 | -------------- | ------------------------ | ------------------------------------------------------------------------ |
@@ -1531,7 +1681,7 @@ the HTTP status, so you can catch a specific case or the base class.
 | `clientRequestId` | `string \| null`      | The `x-client-request-id` header.                                        |
 | `retryAfter`   | `string \| null`         | Raw `Retry-After` response header value.                                 |
 | `retryAfterMs` | `number \| null`         | Suggested wait in milliseconds, when the response gives one.             |
-| `warnings`     | `string[]`               | Informational notices about how the request was handled.                 |
+| `warnings`     | `string[]`               | Notice codes from the `X-DEVUP-Warnings` header (empty when none).       |
 | `headers`      | `Record<string, string>` | Response headers, with lower-case names.                                 |
 | `cause`        | `unknown`                | The underlying error, when available.                                    |
 
@@ -1541,6 +1691,7 @@ The error codes you can act on are listed at
 ```typescript
 import DevupAI, {
   AuthenticationError,
+  BadRequestError,
   DevupAPIError,
   RateLimitError,
 } from "devupai";
@@ -1563,6 +1714,11 @@ async function main() {
   } catch (error) {
     if (error instanceof AuthenticationError) {
       console.error("Check your API key.");
+      return;
+    }
+
+    if (error instanceof BadRequestError && error.code === "context_length_exceeded") {
+      console.error("Shorten the conversation:", error.message);
       return;
     }
 
@@ -1600,6 +1756,57 @@ Webhook signature and payload verification errors throw `DevupWebhookVerificatio
 | `reason`  | `DevupWebhookVerificationErrorReason` | Machine-readable reason code.                                         |
 | `cause`   | `unknown`                             | Underlying error when available (e.g. `SyntaxError` on invalid JSON). |
 
+## Request Size Limits
+
+The request body of chat completions, Responses, embeddings, rerank, image
+generation and edits, transcriptions, and video can be up to 10,485,760 bytes
+(10 MiB), files and Base64-encoded file data included. A larger body returns
+HTTP 413 `payload_too_large`, thrown as `PayloadTooLargeError`; the body is not
+processed and the request is not charged. For large input images or video
+media, send an `https://` URL instead of the file.
+
+Some arrays have a limit too: chat `messages` takes up to 512 entries and
+embeddings `input` up to 2,048 texts. A longer array returns HTTP 400
+`payload_too_large`, thrown as `BadRequestError`.
+
+---
+
+# API Behaviour Since 4.1.0
+
+Since the release of `devupai` 4.1.0, the API answers these cases as follows.
+The 4.2.0 types and this README describe them; no method changes its
+signature.
+
+- **Image model options:** a model's own options, and `image_params` on the
+  model object. See [Model Options](#model-options).
+- **Required options:** an option, image, or mask a model needs, left out,
+  returns HTTP 400 `missing_required_parameter`.
+- **Prompt rules per model:** a model can take no prompt or an optional
+  prompt, and can list a longest prompt, counted in Unicode code points (an
+  emoji counts as one); a longer prompt returns HTTP 400 `invalid_value`.
+- **Input images:** each model lists how many input images it takes and how
+  large they can be; a larger image returns HTTP 400 `invalid_value`.
+- **Masks:** a model lists its mask format (`alpha` or `black_and_white`), and
+  some models need a mask on every edit.
+- **Content policy:** both image endpoints return HTTP 400
+  `content_policy_violation` when the model's content policy does not allow
+  the request. The request is not charged.
+- **Request size:** embeddings, rerank, Responses, and transcriptions return
+  HTTP 413 `payload_too_large` above 10,485,760 bytes (10 MiB). Chat
+  completions, images, and video have the same limit.
+- **Reference audio:** on speech with a model that clones a voice, a
+  `referenceAudioUrl` that names a reference clip that is not one of this
+  account's clips, or is no longer available, returns HTTP 404
+  `reference_audio_not_found`. The request is not charged.
+- **Model strings:** on chat completions, Responses, rerank, video, and
+  native inference, a model identifier longer than 200 characters, or one
+  that is not one or more segments joined by `/` (each starting with a letter
+  or digit and made only of letters, digits, `.`, `_`, and `-`), returns HTTP
+  404 `model_not_found`.
+- **Multipart image fields:** on image generation and edits, a field such as
+  `n` or `size`, or a structured option, sent more than once returns HTTP 400
+  `invalid_value`.
+
 ---
 
 # TypeScript
@@ -1609,7 +1816,12 @@ specification and exported by name: for example `ChatCompletion`,
 `ChatCompletionChunk`, `ChatCompletionCreateParams`, `ResponseObject`,
 `ResponseStreamEvent`, `EmbeddingCreateResponse`, `ModelObject`, and
 `DevUpBilling`. `inference.run()` takes a generic for its model-dependent
-result.
+result. The image option types are `ImageParams`, `ImageParamsOption`, and
+`ImageParamsInputs`.
+
+Types that list string values, such as `ImageParamsOption["kind"]` or
+`ImageParamsInputs["mask_format"]`, list the values the API sends today. New
+enum values may be added, so give a `switch` over them a `default` case.
 
 ```typescript
 import DevupAI, {

@@ -26,7 +26,14 @@ export interface ClientOptions {
     baseURL?: string;
     /** Headers sent with every request. */
     headers?: Record<string, string>;
-    /** How many times a request is sent again after a transient error. Defaults to `2`. */
+    /**
+     * How many times a request is sent again after a transient error. Defaults to `2`; `0`
+     * turns retries off. A request is sent again after a 408, 429, 502, 503 or 504 answer or
+     * a connection error, except a billed request (chat completions, responses, embeddings,
+     * rerank, images, audio, video, inference): it is sent again only after a 429 or 503
+     * answer, or when the connection was never opened, because after any other answer it
+     * may already have been processed and charged.
+     */
     maxRetries?: number;
     /** Timeout of a request in milliseconds. Defaults to `600000` (10 minutes). For streams it covers the time until the response headers arrive. */
     timeout?: number;
@@ -61,7 +68,9 @@ export interface ConditionalRequestOptions extends RequestOptions {
      * An entity tag from a previous answer (its `ETag` header, quotes included); sent as
      * `If-None-Match`. When it still matches, the API answers `304 Not Modified` without
      * a body, and the method resolves with `null` (or with the 304 `Response` for a
-     * method that returns a `Response`) instead of throwing.
+     * method that returns a `Response`) instead of throwing. An `If-None-Match` given in
+     * `headers` gets the same result on a 304; only this option makes the result type
+     * include `null`.
      */
     ifNoneMatch?: string;
 }
@@ -106,10 +115,77 @@ export interface APIRequest {
     /**
      * Sent as the `If-None-Match` header (it wins over one given in `options.headers`).
      * When set, a `304 Not Modified` answer is a result, not an error: `json` resolves
-     * with `null` and `raw` with the 304 `Response`.
+     * with `null` and `raw` with the 304 `Response`. A `GET` with `If-None-Match` in its
+     * headers (client or request headers) is handled the same way.
      */
     ifNoneMatch?: string;
     options?: RequestOptions;
+    /**
+     * Internal: which answers the request is sent again after. Left out: {@link DEFAULT_RETRY}.
+     * Set by the resource methods, never by callers; `maxRetries` still caps every retry.
+     */
+    retry?: RetryPolicy;
+}
+
+/** Internal: which answers a request is sent again after (see {@link APIRequest.retry}). */
+export interface RetryPolicy {
+    /** HTTP statuses after which the request is sent again. */
+    readonly statuses: ReadonlySet<number>;
+    /**
+     * Connection errors (no response received) after which the request is sent again:
+     * `all`, or `not_sent` for only an error showing that the connection was never opened,
+     * so that nothing of the request reached the API.
+     */
+    readonly connectionErrors: "all" | "not_sent";
+}
+
+/** The retries of every request that is not a billed `POST`: 408, 429, 502, 503, 504 and any connection error. */
+export const DEFAULT_RETRY: RetryPolicy = {
+    statuses: new Set([408, 429, 502, 503, 504]),
+    connectionErrors: "all",
+};
+
+/**
+ * The retries of a billed `POST` (chat completions, responses, embeddings, rerank, image
+ * generations and edits, speech, transcriptions, video generations and edits, native
+ * inference): only 429 and 503, which the API answers before a generation runs (a rate or
+ * capacity limit, with `Retry-After` when the API sends one), and a connection that was never
+ * opened. A 408, 502 or 504 answer, or a connection lost after it was opened, can come after
+ * the request was processed and charged, so it is not retried.
+ */
+export const BILLED_POST_RETRY: RetryPolicy = {
+    statuses: new Set([429, 503]),
+    connectionErrors: "not_sent",
+};
+
+/**
+ * Error codes showing that a connection was never opened (refused, name not resolved, or
+ * connect timeout), so the request was not sent. Node's `fetch` reports them on the `cause`
+ * of its `TypeError` (an `Error`, or an `AggregateError` when several addresses were tried).
+ */
+const NOT_SENT_CONNECTION_CODES: ReadonlySet<string> = new Set([
+    "ECONNREFUSED",
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+/** How deep {@link connectionNeverOpened} follows `cause` and `errors`. */
+const MAX_CAUSE_DEPTH = 5;
+
+/**
+ * True when a `fetch` rejection shows that the connection was never opened. The first
+ * error code found on the error or its `cause` chain decides; an `AggregateError` without a
+ * code of its own counts only when every one of its errors does. Anything else is `false`.
+ */
+function connectionNeverOpened(error: unknown, depth = 0): boolean {
+    if (depth > MAX_CAUSE_DEPTH || typeof error !== "object" || error === null) return false;
+    const { code, errors, cause } = error as { code?: unknown; errors?: unknown; cause?: unknown };
+    if (typeof code === "string") return NOT_SENT_CONNECTION_CODES.has(code);
+    if (Array.isArray(errors) && errors.length > 0) {
+        return errors.every((item: unknown) => connectionNeverOpened(item, depth + 1));
+    }
+    return connectionNeverOpened(cause, depth + 1);
 }
 
 /** How a stream recognises an error frame. */
@@ -127,7 +203,6 @@ const DEFAULT_BASE_URL = "https://api.devupai.com/v1";
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_TIMEOUT_MS = 600_000;
 const MAX_TIMER_MS = 2_147_483_647;
-const RETRY_STATUSES: ReadonlySet<number> = new Set([408, 429, 502, 503, 504]);
 const INITIAL_RETRY_DELAY_MS = 500;
 const MAX_RETRY_DELAY_MS = 60_000;
 
@@ -165,6 +240,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function setHeader(headers: Record<string, string>, name: string, value: string): void {
     deleteHeader(headers, name);
     headers[name] = value;
+}
+
+function hasHeader(headers: Record<string, string>, name: string): boolean {
+    const lower = name.toLowerCase();
+    return Object.keys(headers).some((key) => key.toLowerCase() === lower);
 }
 
 function deleteHeader(headers: Record<string, string>, name: string): void {
@@ -356,6 +436,10 @@ export class APIClient {
         // Invalid header names or values throw here, before any request is sent (never retried).
         validateHeaders(headers);
         const fetchImpl = this.#fetch ?? globalThis.fetch;
+        const retry = req.retry ?? DEFAULT_RETRY;
+        // A conditional GET: `ifNoneMatch`, or an `If-None-Match` given in the headers. Either
+        // way a 304 answer is a result, not an error.
+        const conditional = req.ifNoneMatch !== undefined || (req.method === "GET" && hasHeader(headers, "if-none-match"));
 
         const deadline = Date.now() + timeoutMs;
         const timeoutController = new AbortController();
@@ -388,14 +472,15 @@ export class APIClient {
                         undefined,
                         error
                     );
-                    const waitMs = attempt < maxRetries ? this.#retryWait(null, attempt, deadline) : null;
+                    const retryable = retry.connectionErrors === "all" || connectionNeverOpened(error);
+                    const waitMs = retryable && attempt < maxRetries ? this.#retryWait(null, attempt, deadline) : null;
                     if (waitMs === null) throw connectionError;
                     this.#debug({ type: "retry", detail: { attempt: attempt + 1, status: 0, waitMs } });
                     await sleep(waitMs, signal, abortError);
                     continue;
                 }
 
-                if (req.ifNoneMatch !== undefined && response.status === 304) {
+                if (conditional && response.status === 304) {
                     // Not Modified: the copy named by `If-None-Match` is still current. There is
                     // no body to read, so the call ends here with `null` (or the `Response` itself).
                     clearTimeout(timer);
@@ -417,7 +502,7 @@ export class APIClient {
                         // The body could not be read: the message falls back to the HTTP status.
                     }
                     const error = errorFromBody(response.status, text, response.headers);
-                    if (attempt < maxRetries && RETRY_STATUSES.has(response.status)) {
+                    if (attempt < maxRetries && retry.statuses.has(response.status)) {
                         const waitMs = this.#retryWait(error.retryAfterMs, attempt, deadline);
                         if (waitMs !== null) {
                             this.#debug({

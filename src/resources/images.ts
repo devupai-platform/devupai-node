@@ -1,4 +1,4 @@
-import type { RequestOptions } from "../core/client";
+import { BILLED_POST_RETRY, type RequestOptions } from "../core/client";
 import type { APIPromise } from "../core/api-promise";
 import { DevupAPIError } from "../core/errors";
 import type { ImageEditJsonParams, ImageEditParams, ImageGenerateParams, ImageGenerateResponse } from "../types";
@@ -78,6 +78,7 @@ export class Images extends APIResource {
             body,
             auth: true,
             options: requestOptions,
+            retry: BILLED_POST_RETRY,
         });
     }
 
@@ -132,6 +133,7 @@ export class Images extends APIResource {
             body: hasFile ? editForm(fields) : body,
             auth: true,
             options: requestOptions,
+            retry: BILLED_POST_RETRY,
         });
     }
 

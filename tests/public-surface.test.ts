@@ -153,6 +153,10 @@ const ALLOWED_TEXT: AllowedText[] = [
     { text: "cached?:", files: SCHEMA_FILE, why: "price field of a model for reused prompt tokens" },
     { text: "cached:", files: ["tests/contract.test.ts"], why: "the same price field, in a schema fixture" },
     { text: "cached input tokens", files: SCHEMA_FILE, why: "spec description of that price field" },
+    { text: "one field holding JSON text", files: SCHEMA_FILE, why: "plain English verb in the spec's image option text (multipart edit), not a billing term" },
+    { text: "one field holding the JSON text", files: SCHEMA_FILE, why: "plain English verb in the spec's image option text (structured options), not a billing term" },
+    { text: "these options hold one of the listed values", files: SCHEMA_FILE, why: "plain English verb in the spec's image option text (`when` and `send_when`), not a billing term" },
+    { text: "The model list is cached for up to 5 minutes", files: SCHEMA_FILE, why: "how long the spec says a model list answer can be reused (Cache-Control), not a billing term" },
     { text: "Cache-Control", why: "HTTP header name" },
     // The Vercel AI SDK integration (devupai/ai): package, file and identifier names it must use.
     { text: "@ai-sdk/provider", why: "npm package of the AI SDK model interfaces, a peer dependency (also matches its -utils package)" },

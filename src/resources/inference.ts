@@ -1,4 +1,4 @@
-import type { APIRequest, RequestOptions } from "../core/client";
+import { BILLED_POST_RETRY, type APIRequest, type RequestOptions } from "../core/client";
 import type { APIPromise } from "../core/api-promise";
 import { APIResource, mergeRequestOptions } from "./shared";
 
@@ -79,6 +79,7 @@ export class NativeInference extends APIResource {
             body: payload,
             auth: true,
             options: mergeRequestOptions(undefined, requestOptions),
+            retry: BILLED_POST_RETRY,
         };
         if (responseType === "binary") return this._client.raw(request);
         return this._client.json<unknown>(request);

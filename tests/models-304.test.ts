@@ -76,11 +76,10 @@ describe("models.list with ifNoneMatch", () => {
         expect(e.requestId).toBe(REQ_ID);
     });
 
-    it("a 304 answer with If-None-Match given only as a header (not the option) still throws", async () => {
+    it("a 304 answer with If-None-Match given only as a header (not the option) resolves null, as the option does", async () => {
         const { client } = setup(() => notModified());
-        const err = await client.models.list({ headers: { "If-None-Match": ETAG } }).catch((e: unknown) => e);
-        expect(err).toBeInstanceOf(DevupAPIError);
-        expect((err as DevupAPIError).status).toBe(304);
+        const result: unknown = await client.models.list({ headers: { "If-None-Match": ETAG } });
+        expect(result).toBeNull();
     });
 });
 

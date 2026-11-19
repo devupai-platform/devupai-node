@@ -94,10 +94,14 @@ export * from "./types";
 
 export {
     DevupAPIError,
+    BadRequestError,
     AuthenticationError,
+    PaymentRequiredError,
     PermissionDeniedError,
     NotFoundError,
     ConflictError,
+    PayloadTooLargeError,
+    UnprocessableEntityError,
     RateLimitError,
     InternalServerError,
     APIConnectionError,

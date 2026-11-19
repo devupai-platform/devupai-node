@@ -111,11 +111,30 @@ export class DevupAPIError extends Error {
     }
 }
 
+/** HTTP 400: the request is not valid as sent. `code` and `param` name the reason and the field. */
+export class BadRequestError extends DevupAPIError {
+    constructor(...args: ConstructorParameters<typeof DevupAPIError>) {
+        super(...args);
+        this.name = "BadRequestError";
+    }
+}
+
 /** HTTP 401: the API key is missing or not valid. */
 export class AuthenticationError extends DevupAPIError {
     constructor(...args: ConstructorParameters<typeof DevupAPIError>) {
         super(...args);
         this.name = "AuthenticationError";
+    }
+}
+
+/**
+ * HTTP 402: the account balance (`code` `insufficient_balance`), or the budget of a scoped
+ * credential (`budget_exhausted`), does not cover the request.
+ */
+export class PaymentRequiredError extends DevupAPIError {
+    constructor(...args: ConstructorParameters<typeof DevupAPIError>) {
+        super(...args);
+        this.name = "PaymentRequiredError";
     }
 }
 
@@ -140,6 +159,22 @@ export class ConflictError extends DevupAPIError {
     constructor(...args: ConstructorParameters<typeof DevupAPIError>) {
         super(...args);
         this.name = "ConflictError";
+    }
+}
+
+/** HTTP 413: the request body is larger than the endpoint takes. Send a smaller body. */
+export class PayloadTooLargeError extends DevupAPIError {
+    constructor(...args: ConstructorParameters<typeof DevupAPIError>) {
+        super(...args);
+        this.name = "PayloadTooLargeError";
+    }
+}
+
+/** HTTP 422: the request is well formed, but a value in it cannot be processed. `code` and `param` name it. */
+export class UnprocessableEntityError extends DevupAPIError {
+    constructor(...args: ConstructorParameters<typeof DevupAPIError>) {
+        super(...args);
+        this.name = "UnprocessableEntityError";
     }
 }
 
@@ -185,10 +220,14 @@ export function makeAPIError(
     errorData: APIErrorData | undefined,
     headers: Headers | undefined
 ): DevupAPIError {
+    if (status === 400) return new BadRequestError(status, message, errorData, headers);
     if (status === 401) return new AuthenticationError(status, message, errorData, headers);
+    if (status === 402) return new PaymentRequiredError(status, message, errorData, headers);
     if (status === 403) return new PermissionDeniedError(status, message, errorData, headers);
     if (status === 404) return new NotFoundError(status, message, errorData, headers);
     if (status === 409) return new ConflictError(status, message, errorData, headers);
+    if (status === 413) return new PayloadTooLargeError(status, message, errorData, headers);
+    if (status === 422) return new UnprocessableEntityError(status, message, errorData, headers);
     if (status === 429) return new RateLimitError(status, message, errorData, headers);
     if (status >= 500) return new InternalServerError(status, message, errorData, headers);
     return new DevupAPIError(status, message, errorData, headers);

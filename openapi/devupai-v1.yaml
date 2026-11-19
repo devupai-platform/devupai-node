@@ -354,6 +354,8 @@ paths:
         Set `stream: true` to receive the response as Server-Sent Events.
         Responses are not stored (`store` is always `false`). A non-streaming request
         returns a Responses object with a `_devup` billing metadata object.
+        The request body can be up to 10,485,760 bytes (10 MiB); a larger body
+        returns HTTP 413 `payload_too_large`.
       tags: [Responses]
       requestBody:
         required: true
@@ -553,6 +555,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '415':
           $ref: '#/components/responses/UnprocessableRequest'
         '422':
@@ -575,7 +579,9 @@ paths:
       summary: Create embeddings
       description: >
         Generates embedding vectors for the given input text or array of
-        texts. Compatible with the OpenAI embeddings API.
+        texts. Compatible with the OpenAI embeddings API. The request body can
+        be up to 10,485,760 bytes (10 MiB); a larger body returns HTTP 413
+        `payload_too_large`.
       tags: [Embeddings]
       requestBody:
         required: true
@@ -648,6 +654,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '415':
           $ref: '#/components/responses/UnprocessableRequest'
         '422':
@@ -671,6 +679,8 @@ paths:
       description: >
         Reranks a list of documents based on their semantic relevance to the provided query.
         Returns a sorted list of relevance scores and optionally the documents themselves.
+        The request body can be up to 10,485,760 bytes (10 MiB); a larger body
+        returns HTTP 413 `payload_too_large`.
       tags: [Reranking]
       requestBody:
         required: true
@@ -778,6 +788,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '415':
           $ref: '#/components/responses/UnprocessableRequest'
         '422':
@@ -804,8 +816,9 @@ paths:
         The file is deleted automatically after a short period.
         On models that list them, image options (size, quality, complexity,
         background, output format and compression, number of images, and
-        more) are set by the fields of `ImageGenerationRequest`; each model
-        lists its options and the values it accepts on its model page. To edit
+        more, including options of the model's own under their own name) are
+        set by the fields of `ImageGenerationRequest`; each model lists its
+        options and the values it accepts on its model page. To edit
         images, use `POST /v1/images/edits`. `stream: true` returns HTTP 400
         `unsupported_parameter`. The request body can be up to 10,485,760 bytes
         (10 MiB), files and data URIs included; a larger body returns HTTP 413
@@ -936,6 +949,20 @@ paths:
                       message: 'The "prompt" field is required.'
                       type: devup_error
                       code: missing_prompt
+                missing_required_parameter_option:
+                  summary: No value for an option the model page marks as required
+                  value:
+                    error:
+                      message: 'This model needs `aspect_ratio`. Available: `1:1`, `16:9`.'
+                      type: devup_error
+                      code: missing_required_parameter
+                invalid_value_prompt_length:
+                  summary: A prompt longer than the model takes
+                  value:
+                    error:
+                      message: '`prompt` can be up to 1,000 characters on this model.'
+                      type: devup_error
+                      code: invalid_value
                 invalid_size:
                   summary: size is not in the form <width>x<height>
                   value:
@@ -964,6 +991,27 @@ paths:
                       message: Inference steps must be a positive number.
                       type: devup_error
                       code: invalid_steps
+                invalid_steps_range:
+                  summary: Steps outside the range the model lists (a model that lists no image options)
+                  value:
+                    error:
+                      message: num_inference_steps must be an integer between 1 and 50.
+                      type: devup_error
+                      code: invalid_steps
+                invalid_value_steps_mismatch:
+                  summary: num_inference_steps and the model's own field for the steps differ (a model that lists no image options)
+                  value:
+                    error:
+                      message: num_steps and num_inference_steps must agree. Send one of them, or the same value in both.
+                      type: devup_error
+                      code: invalid_value
+                invalid_size_model_range:
+                  summary: A size above the largest the model lists (a model that lists no image options)
+                  value:
+                    error:
+                      message: This model takes sizes up to 1440x1440 (received 2048x2048).
+                      type: devup_error
+                      code: invalid_size
                 unsupported_parameter_output_format:
                   summary: output_format is svg
                   value:
@@ -999,6 +1047,41 @@ paths:
                       message: '`size` 1000x1000 is not available on this model: each side must be a multiple of 16.'
                       type: devup_error
                       code: invalid_value
+                invalid_value_custom_size_condition:
+                  summary: A custom size with a value of another option the model does not take it with
+                  value:
+                    error:
+                      message: '`size` is not available with `aspect_ratio` `16:9` on this model.'
+                      type: devup_error
+                      code: invalid_value
+                invalid_value_model_option:
+                  summary: A value outside the values the model lists for one of its own options
+                  value:
+                    error:
+                      message: '`8MP` is not available for `resolution` on this model. Available: `1MP`, `2MP`.'
+                      type: devup_error
+                      code: invalid_value
+                invalid_value_model_option_switch:
+                  summary: A switch of the model's own sent with a value other than true or false
+                  value:
+                    error:
+                      message: '`prompt_extend` must be true or false.'
+                      type: devup_error
+                      code: invalid_value
+                invalid_value_model_option_range:
+                  summary: A number outside the range the model lists for one of its own options
+                  value:
+                    error:
+                      message: '`20` is not available for `creativity` on this model. Available: -10 to 10.'
+                      type: devup_error
+                      code: invalid_value
+                invalid_value_repeated_field:
+                  summary: A multipart field that sets the size, the number of images or the steps, or a structured option, sent more than once
+                  value:
+                    error:
+                      message: '`n` must be sent once.'
+                      type: devup_error
+                      code: invalid_value
                 unsupported_parameter:
                   summary: An image option the model does not list
                   value:
@@ -1020,6 +1103,13 @@ paths:
                       message: This model is not served on /v1/images/generations. Use /v1/images/edits instead.
                       type: devup_error
                       code: invalid_route
+                content_policy_violation:
+                  summary: The model's content policy does not allow the request (not billed)
+                  value:
+                    error:
+                      message: The model's content policy does not allow this request. It was not billed. Change the prompt or the input images and retry.
+                      type: devup_error
+                      code: content_policy_violation
         '401':
           $ref: '#/components/responses/Unauthorized'
         '402':
@@ -1058,11 +1148,18 @@ paths:
         images are sent in `image` (multipart: one `image` part per image, or
         `image[]`; JSON: `images` as a list of `{"image_url": ...}` objects or
         strings, or `image` as one item or a list), as HTTPS URLs, data URIs or
-        files; `mask` and `markup` (not both) on models that list them. Up to 16
+        files; `mask` and `markup` (not both) on models that list them. Some
+        models need `mask`, and some take `mask` with up to a number of images
+        only; on some models, the first image is edited and the others guide
+        the edit, as the model page shows. Up to 16
         images per request, or fewer when the model lists fewer. Images can be
         PNG, JPEG or WebP, at most 10 MB each and at most 4096 pixels on a side,
-        and at most 50 MB together. File ids are not supported. The image
+        and at most 50 MB together. Some models take smaller input images, as
+        the model page shows; a larger image returns HTTP 400 `invalid_value`
+        before anything is charged, and is never resized. File ids are not supported. The image
         options of `POST /v1/images/generations` apply, as the model lists them.
+        Structured options of the model's own are sent as `ImageGenerationRequest`
+        describes; on some models, such a value has one entry per input image.
         The request body can be up to 10,485,760 bytes (10 MiB), files and data
         URIs included; a larger body returns HTTP 413 `payload_too_large`.
       tags: [Images]
@@ -1211,6 +1308,34 @@ paths:
                       message: '`mask` needs `image` on this model.'
                       type: devup_error
                       code: invalid_value
+                invalid_value_mask_images:
+                  summary: A mask with more images than the model takes with a mask
+                  value:
+                    error:
+                      message: '`mask` can be used with up to 1 image on this model.'
+                      type: devup_error
+                      code: invalid_value
+                invalid_value_input_image_pixels:
+                  summary: An input image larger than the model takes
+                  value:
+                    error:
+                      message: '`image[0]` is 3000x3000; each input image can be up to 4,194,304 pixels (for example 2,048x2,048) on this model.'
+                      type: devup_error
+                      code: invalid_value
+                invalid_value_structured_length:
+                  summary: A structured value without one entry per input image
+                  value:
+                    error:
+                      message: '`regions` must have one entry per input image (2 images, 3 entries).'
+                      type: devup_error
+                      code: invalid_value
+                invalid_value_repeated_field:
+                  summary: A multipart field that sets the size, the number of images or the steps, or a structured option, sent more than once
+                  value:
+                    error:
+                      message: '`n` must be sent once.'
+                      type: devup_error
+                      code: invalid_value
                 unsupported_content_file_id:
                   summary: An input image sent as a file id
                   value:
@@ -1232,6 +1357,27 @@ paths:
                       message: 'This model needs `image`.'
                       type: devup_error
                       code: missing_required_parameter
+                missing_required_parameter_mask:
+                  summary: An edit without a mask, on a model that needs one
+                  value:
+                    error:
+                      message: 'This model needs `mask`.'
+                      type: devup_error
+                      code: missing_required_parameter
+                missing_required_parameter_option:
+                  summary: No value for an option the model page marks as required
+                  value:
+                    error:
+                      message: 'This model needs `aspect_ratio`. Available: `1:1`, `16:9`.'
+                      type: devup_error
+                      code: missing_required_parameter
+                invalid_value_prompt_length:
+                  summary: A prompt longer than the model takes
+                  value:
+                    error:
+                      message: '`prompt` can be up to 1,000 characters on this model.'
+                      type: devup_error
+                      code: invalid_value
                 unsupported_parameter_stream:
                   summary: stream is true
                   value:
@@ -1246,6 +1392,13 @@ paths:
                       message: This model is not served on /v1/images/edits. Use /v1/images/generations instead.
                       type: devup_error
                       code: invalid_route
+                content_policy_violation:
+                  summary: The model's content policy does not allow the request (not billed)
+                  value:
+                    error:
+                      message: The model's content policy does not allow this request. It was not billed. Change the prompt or the input images and retry.
+                      type: devup_error
+                      code: content_policy_violation
         '401':
           $ref: '#/components/responses/Unauthorized'
         '402':
@@ -1595,7 +1748,45 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: '#/components/responses/NotFound'
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          description: >
+            The requested model identifier was not found in the catalog, or no
+            endpoint exists at the method and path, or, on a model that clones a
+            voice, `referenceAudioUrl` names a reference clip that is not one of
+            this account's clips or is no longer available
+            (`reference_audio_not_found`, not charged). It is not retryable unless
+            the model identifier, the method and path, or `referenceAudioUrl` are
+            changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                model_not_found:
+                  summary: Model not found in catalog
+                  value:
+                    error:
+                      message: "The requested model was not found."
+                      type: devup_error
+                      code: model_not_found
+                endpoint_not_found:
+                  summary: No endpoint at this method and path
+                  value:
+                    error:
+                      message: No endpoint exists at POST /v1/chat/completion.
+                      type: devup_error
+                      code: endpoint_not_found
+                reference_audio_not_found:
+                  summary: referenceAudioUrl names a reference clip that is not one of this account's clips (not charged)
+                  value:
+                    error:
+                      message: referenceAudioUrl does not refer to a reference audio file of this account. Upload the file again, or send another HTTPS URL.
+                      type: devup_error
+                      code: reference_audio_not_found
         '409':
           $ref: '#/components/responses/Conflict'
         '415':
@@ -1641,7 +1832,9 @@ paths:
       description: >
         Transcribes audio into text using speech recognition models.
         Accepts multipart/form-data with a `file` field containing the
-        audio data. Billed per audio minute.
+        audio data. Billed per audio minute. The request body can be up to
+        10,485,760 bytes (10 MiB), the audio file included; a larger body
+        returns HTTP 413 `payload_too_large`.
       tags: [Audio]
       requestBody:
         required: true
@@ -1713,6 +1906,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '415':
           $ref: '#/components/responses/UnprocessableRequest'
         '422':
@@ -1789,6 +1984,12 @@ paths:
               anyOf:
                 - $ref: '#/components/schemas/VideoEditRequest'
                 - $ref: '#/components/schemas/VideoGenerationFormRequest'
+            examples:
+              basic:
+                summary: Prompt only
+                value:
+                  model: Lightricks/LTX-2.3-Fast
+                  prompt: A cat astronaut floating in space
       responses:
         '200':
           headers:
@@ -2858,6 +3059,27 @@ components:
               message: The request body exceeds the limit of 10,485,760 bytes (10 MiB). Base64-encoded file data counts toward this limit.
               type: devup_error
               code: payload_too_large
+    PayloadTooLarge:
+      description: >
+        The request body of `POST /v1/responses`, `POST /v1/embeddings`,
+        `POST /v1/rerank` or `POST /v1/audio/transcriptions` is larger than
+        10,485,760 bytes (10 MiB). Uploaded files and Base64-encoded file data
+        count toward this limit. The body is not processed and the request is
+        not charged.
+      headers:
+        x-request-id:
+          $ref: '#/components/headers/XRequestId'
+        x-client-request-id:
+          $ref: '#/components/headers/XClientRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              message: The request body exceeds the limit of 10,485,760 bytes (10 MiB). Base64-encoded file data counts toward this limit.
+              type: devup_error
+              code: payload_too_large
     Unauthorized:
       description: |
         Missing, empty, invalid, expired or revoked API key.
@@ -3114,7 +3336,13 @@ components:
       description: >
         The requested model identifier was not found in the catalog, or no
         endpoint exists at the method and path. It is not retryable unless the
-        model identifier, or the method and path, are changed.
+        model identifier, or the method and path, are changed. On
+        `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/rerank`,
+        `POST /v1/video/generations` and `POST /v1/inference/{model_path}`, a
+        model identifier longer than 200 characters, or one that is not one or
+        more segments joined by `/`, each starting with a letter or digit and
+        made only of letters, digits, `.`, `_` and `-`, returns HTTP 404
+        `model_not_found`.
       headers:
         x-request-id:
           $ref: '#/components/headers/XRequestId'
@@ -4236,33 +4464,60 @@ components:
         Send it to `POST /v1/images/edits`. On models that list image options,
         the option fields of `ImageGenerationRequest` are sent as text fields
         (whole numbers as decimal text, for example `2`), and the rules of
-        `ImageGenerationRequest` apply. On models that list no image options, a
-        multipart request to `POST /v1/images/generations` keeps working as
-        before.
+        `ImageGenerationRequest` apply. Options of the model's own (the
+        additional properties of this schema) are text fields under the model's
+        own parameter name; a switch is sent as `true` or `false`; a structured
+        option is one field holding JSON text, sent once. On models
+        that list no image options, a multipart request to
+        `POST /v1/images/generations` keeps working as before.
+        On models that list no image options, `n`, `size`, `width`,
+        `height`, `steps`, `num_inference_steps`, or the model's own count or
+        steps field, sent as more than one part, can return
+        HTTP 400 `invalid_value` (for example "`n` must be sent once.");
+        on models that list image options, so does a structured option sent
+        as more than one part. This applies on `POST /v1/images/generations` and
+        `POST /v1/images/edits` alike.
+      additionalProperties: true
       properties:
         model:
           type: string
           description: Image generation model identifier.
         prompt:
           type: string
-          description: Text description of the desired image edits.
+          description: >
+            Text description of the desired image edits. Required on most
+            models. A model that takes no prompt says so on its model page:
+            there `prompt` can be left out, and one sent is not used (notice
+            `parameter_not_supported`). On a model where it is optional, it is
+            sent only when you send it. Some models take a prompt up to a
+            length, counted in characters (Unicode code points: an emoji counts
+            as one); the model page lists it, and a longer prompt returns HTTP
+            400 `invalid_value`, before anything is charged.
         image:
           type: string
           format: binary
           description: >
             Base image to edit. To send several images, repeat the part once
             per image, or name the parts `image[]`; the first image is the one
-            a mask or markup applies to. A part can also carry an HTTPS URL or a
-            data URI as text. PNG, JPEG or WebP. Each model lists how many
-            images it takes on its model page.
+            a mask or markup applies to. On some models, the first image is
+            edited and the others guide the edit, as the model page shows. A
+            part can also carry an HTTPS URL or a data URI as text. PNG, JPEG or
+            WebP. Each model lists how many images it takes on its model page.
         mask:
           type: string
           format: binary
           description: >
-            Optional mask for inpainting. On models that list it: a PNG with an
-            alpha channel, the same width and height as the first image. Its
-            transparent areas mark the part of the image to edit. Not with
-            `markup`.
+            Mask for inpainting. On models that list it: an image with the same
+            width and height as the first image, that marks the part of it to
+            edit. The format depends on the model: a PNG whose transparent
+            areas mark the part to edit, or a black-and-white image where white
+            marks the part to edit and black the part to keep. A mask of another
+            width or height returns HTTP 400 `invalid_value`, and so does a mask
+            without transparent areas on a model that takes a transparent mask.
+            Not with `markup`. Required on models that list it so (HTTP 400
+            `missing_required_parameter` without it); on some models taken with
+            up to a number of images only (HTTP 400 `invalid_value` with more,
+            naming the number).
         markup:
           type: string
           format: binary
@@ -4343,12 +4598,17 @@ components:
         supported and return HTTP 400 `unsupported_content`. Up to 16 images per
         request, or fewer when the model lists fewer; PNG, JPEG or WebP, at most
         10 MB each and at most 4096 pixels on a side, and at most 50 MB together.
+        Some models take smaller input images, as the model page shows; a larger
+        image returns HTTP 400 `invalid_value` before anything is charged.
         On a model that does not list an input, sending it returns HTTP 400
         `unsupported_content`; a model that needs `image` returns HTTP 400
-        `missing_required_parameter` without it.
+        `missing_required_parameter` without it. Options of the model's own
+        are sent as in `ImageGenerationRequest`; a structured option is sent as
+        a JSON value.
       allOf:
         - $ref: '#/components/schemas/ImageGenerationRequest'
         - type: object
+          additionalProperties: true
           properties:
             images:
               type: array
@@ -4356,8 +4616,10 @@ components:
               maxItems: 16
               description: >
                 The images to edit, in order; the first image is the one a mask
-                or markup applies to. Alias of `image`; when both are sent,
-                `image` applies, with the notice `parameter_superseded`.
+                or markup applies to. On some models, the first image is edited
+                and the others guide the edit, as the model page shows. Alias of
+                `image`; when both are sent, `image` applies, with the notice
+                `parameter_superseded`.
               items:
                 oneOf:
                   - type: string
@@ -4379,9 +4641,17 @@ components:
                       - $ref: '#/components/schemas/ImageInputUrl'
             mask:
               description: >
-                On models that list it: a PNG with an alpha channel, the same
-                width and height as the first image. Its transparent areas mark
-                the part of the image to edit. Not with `markup`.
+                On models that list it: an image with the same width and height
+                as the first image, that marks the part of it to edit. The
+                format depends on the model: a PNG whose transparent areas mark
+                the part to edit, or a black-and-white image where white marks
+                the part to edit and black the part to keep. A mask of another
+                width or height returns HTTP 400 `invalid_value`, and so does a
+                mask without transparent areas on a model that takes a
+                transparent mask. Not with `markup`. Required on
+                models that list it so (HTTP 400 `missing_required_parameter`
+                without it); on some models taken with up to a number of images
+                only (HTTP 400 `invalid_value` with more, naming the number).
               oneOf:
                 - type: string
                   description: An HTTPS URL or a data URI.
@@ -4413,30 +4683,80 @@ components:
         Models offer different image options. Each model lists its options, and
         the values it accepts, on its model page. The rules below apply to
         models that list options; a model that lists none takes `prompt`,
-        `size` (or `width` and `height`), `n` and `response_format` as before.
-        An option left out takes the model's default value, and the image is
-        generated with it. On models that list options, an option that changes
-        the image and that the model does not list (`size`, `quality`,
-        `complexity`, `background`, `output_format`, `output_compression`,
-        `aspect_ratio`) returns HTTP 400 `unsupported_parameter`; `seed`,
-        `num_inference_steps`, `guidance_scale`, `negative_prompt`, `"auto"`
-        for a `size` or `quality` the model does not list, and parameters this
-        schema does not define are answered without them, with the notice
-        `parameter_not_supported`. A value or combination the model does not
-        accept returns HTTP 400 `invalid_value`, and the message names what the
-        model accepts. On a model that lists `size` or `quality`, `"auto"` for
-        it generates the image with the model's default value, with the notice
-        `auto_value_applied`. When a parameter and one of its aliases are both
-        sent, the parameter applies, with the notice `parameter_superseded`.
-        `stream: true` returns HTTP 400 `unsupported_parameter` on every image
-        model.
+        `size` (or `width` and `height`), `n` and `response_format` as before,
+        and its number of steps and its size are checked against the range and
+        the largest size the model lists (HTTP 400 `invalid_steps`,
+        `invalid_size` or `invalid_dimensions`, naming them).
+        `prompt` is required on most models. A model that takes no prompt says
+        so on its model page: there `prompt` can be left out, and one sent is
+        not used (notice `parameter_not_supported`). On a model where it is
+        optional, it is sent only when you send it. Some models take a prompt
+        up to a length, counted in characters, which the model page lists; a
+        longer prompt returns HTTP 400 `invalid_value`. A model that takes no
+        prompt has no length.
+        An option left out takes the default the model page lists, and the
+        image is generated with it; an option listed without a default is not
+        sent unless the request sends it, and the model uses its own value.
+        An option the model page marks as required has no default and must be
+        sent: a request without it returns HTTP 400
+        `missing_required_parameter`, before anything is charged, and the
+        message names the option and what it takes. On
+        models that list options, an option that changes the image and that the
+        model does not list (`size`, `quality`, `complexity`, `background`,
+        `output_format`, `output_compression`, `aspect_ratio`) returns HTTP 400
+        `unsupported_parameter`; `seed`, `num_inference_steps`,
+        `guidance_scale`, `negative_prompt`, `"auto"` for a `size` or `quality`
+        the model does not list, and parameters this schema does not define are
+        answered without them, with the notice `parameter_not_supported`,
+        unless the model lists them as options of its own. A value or
+        combination the model does not accept returns HTTP 400 `invalid_value`,
+        and the message names what the model accepts. On a model that lists
+        `size` or `quality`, `"auto"` for it generates the image with the
+        model's default value, with the notice `auto_value_applied`. When a
+        parameter and one of its aliases are both sent, the parameter applies,
+        with the notice `parameter_superseded`. `stream: true` returns HTTP 400
+        `unsupported_parameter` on every image model.
+
+
+        Options of the model's own (the additional properties of this schema):
+        some models list options under the model's own parameter name, a switch
+        (`true` or `false`), a list of values (case kept, for example `2MP`), a
+        number inside a range, or a text up to a length. Send the name and a
+        value as the model page lists them; such a parameter is sent under its
+        own name. A value outside what the model lists returns HTTP 400
+        `invalid_value`, naming the parameter and what it takes. A parameter the
+        model does not list is answered without it, with the notice
+        `parameter_not_supported`.
+
+
+        Structured options of the model's own (`kind` `structured` in
+        `image_params` of `GET /v1/models/{model}`): the value is JSON, a list
+        or an object, that the option's `schema` describes. In a JSON request,
+        send it as a JSON value; in a `multipart/form-data` request, send it
+        once, as one field holding the JSON text. On some edit models, the value
+        is a list with one entry per input image (`length_matches`
+        `input_images`). Such an option has no default: it is sent only when
+        the request sends it. A value that does not match, a form field sent
+        more than once, or a form field that is not JSON text returns HTTP 400
+        `invalid_value` before anything is charged; the message names the field
+        and the rule, for example: `regions` must have one entry per input
+        image (2 images, 3 entries).
+      additionalProperties: true
       properties:
         model:
           type: string
           description: Image generation model identifier.
         prompt:
           type: string
-          description: Text description of the desired image.
+          description: >
+            Text description of the desired image. Required on most models. A
+            model that takes no prompt says so on its model page: there
+            `prompt` can be left out, and one sent is not used (notice
+            `parameter_not_supported`). On a model where it is optional, it is
+            sent only when you send it. Some models take a prompt up to a
+            length, counted in characters (Unicode code points: an emoji counts
+            as one); the model page lists it, and a longer prompt returns HTTP
+            400 `invalid_value`, before anything is charged.
         negative_prompt:
           type: string
           description: >
@@ -4449,9 +4769,19 @@ components:
             Image dimensions (e.g., `1024x1024`, `512x512`), as `WIDTHxHEIGHT`.
             Each model lists its sizes on its model page; some models also take
             other sizes inside rules the model page lists, and a size outside
-            them returns HTTP 400 `invalid_value` naming the rule. On models that
+            them returns HTTP 400 `invalid_value` naming the rule. Some models
+            take such a custom size only with one value of another option, for
+            example `aspect_ratio` `custom`: sent with another value, HTTP 400
+            `invalid_value`; sent without that option, the option is set to that
+            value, with the notice `condition_value_applied`. On models that
             list image options, a size left out takes the model's default size,
-            and `auto` generates the image at that size.
+            and `auto` generates the image at that size. On some models the size
+            has no default: left out, it is not sent and the model uses its own
+            size; on such a model priced by size, a request without `size`, or
+            with `auto`, is billed at the size the notice `default_size_billed`
+            names. On a model that lists no image options and lists its largest
+            size, a larger size returns HTTP 400 `invalid_size` (or
+            `invalid_dimensions` for `width` and `height`) naming that size.
         n:
           type: integer
           minimum: 1
@@ -4459,7 +4789,7 @@ components:
           default: 1
           description: >
             Number of images to generate. On models that list image options, up
-            to the number the model lists.
+            to the number the model lists. Left out: 1.
         width:
           type: integer
           description: >
@@ -4511,7 +4841,12 @@ components:
           type: integer
           description: >
             Number of diffusion steps, inside the range the model lists. Alias:
-            `steps`.
+            `steps`. On a model that lists no image options and lists a range of
+            steps, a value that is not a whole number inside it returns HTTP 400
+            `invalid_steps` naming the field and the range; sent alone, it also
+            sets the model's own field for the steps, and the request is billed
+            with it. Sent with the model's own field and a different value, HTTP
+            400 `invalid_value`.
         guidance_scale:
           type: number
           description: >
@@ -4644,10 +4979,14 @@ components:
           type: string
           format: uri
           description: |
-            Public HTTPS URL to a reference audio file for voice cloning.
+            HTTPS URL of a reference audio file for voice cloning.
             Required by models that clone a voice from a reference recording; without it they
-            return HTTP 400 `reference_audio_required`. Must be a publicly reachable HTTPS URL;
-            any other URL returns HTTP 400 `invalid_reference_audio_url`, for every model.
+            return HTTP 400 `reference_audio_required`. Must be a publicly reachable HTTPS URL,
+            or the URL of a reference clip uploaded with this account. On a model that clones
+            a voice, the URL of a reference clip that is not one of this account's clips, or
+            that is no longer available, returns HTTP 404 `reference_audio_not_found` and is not
+            charged. Any other URL that is not a publicly reachable HTTPS URL returns HTTP 400
+            `invalid_reference_audio_url`, for every model.
             Other models do not use the reference audio.
 
     SpeechResponse:
@@ -4793,7 +5132,8 @@ components:
             Text description of the desired video. On models that speak your
             text, such as avatar models, `prompt` is the script the avatar
             speaks. Some models take a shorter prompt; the model page lists the
-            limit, and a longer prompt returns HTTP 400 `invalid_value`.
+            limit (an emoji counts as one), and a longer prompt returns HTTP 400
+            `invalid_value`.
         negative_prompt:
           type: string
           description: >
@@ -5093,7 +5433,10 @@ components:
           description: Video generation model identifier.
         prompt:
           type: string
-          description: Text description of the desired video.
+          description: >
+            Text description of the desired video. Some models take a shorter
+            prompt; the model page lists the limit (an emoji counts as one), and
+            a longer prompt returns HTTP 400 `invalid_value`.
         image:
           type: string
           format: binary
@@ -5475,6 +5818,260 @@ components:
             mode: on_request
             parameter: reasoning_effort
             values: [low, medium, high]
+        image_params:
+          $ref: '#/components/schemas/ImageParams'
+
+    ImageParams:
+      type: object
+      description: >
+        The image options of a model, as its model page lists them: the
+        endpoints it is served on, the options it takes with the values it
+        accepts, the input images an edit takes, and how it takes a prompt.
+        Present on models that list image options; absent otherwise. Field
+        names and values are the ones a request sends, unchanged. The model
+        list is cached for up to 5 minutes, so a change to a model's options
+        can take that long to appear here.
+      required: [endpoints, options]
+      properties:
+        endpoints:
+          type: array
+          items:
+            type: string
+            enum: [generations, edits]
+          description: >
+            The image endpoints the model is served on: `generations`
+            (`POST /v1/images/generations`) and `edits`
+            (`POST /v1/images/edits`).
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageParamsOption'
+          description: >
+            The options the model takes. An option without `kind` is an image
+            option of `ImageGenerationRequest` (`size`, `quality`, `n`, ...). An
+            option with `kind` is an option of the model's own, sent under its
+            own name.
+        inputs:
+          $ref: '#/components/schemas/ImageParamsInputs'
+        prompt:
+          type: string
+          enum: [none, optional]
+          description: >
+            `none`: the model takes no prompt. `optional`: a prompt is optional.
+            Absent: a prompt is required.
+        prompt_max_length:
+          type: integer
+          description: >
+            The longest prompt the model takes, in characters (Unicode code
+            points: an emoji counts as one).
+      additionalProperties: false
+
+    ImageParamsOption:
+      type: object
+      description: >
+        One option of a model: its request field name and what it takes. Each
+        key is present only when it applies to the option.
+      required: [field]
+      properties:
+        field:
+          type: string
+          description: The request field name, as the request sends it.
+        kind:
+          type: string
+          enum: [boolean, choice, int, decimal, text, structured]
+          description: >
+            Options of the model's own only: `boolean` (`true` or `false`),
+            `choice` (one of `values`), `int` (a whole number inside `range`),
+            `decimal` (a number inside `range`), `text` (a text up to
+            `max_length` characters) or `structured` (a JSON value, a list or
+            an object, that `schema` describes). Absent on the image options of
+            `ImageGenerationRequest`.
+        values:
+          type: array
+          items:
+            type: [string, number]
+          description: The accepted values, case kept.
+        range:
+          type: object
+          description: >
+            The accepted numbers: from `min` to `max`, in steps of `step` when
+            listed.
+          required: [min, max]
+          properties:
+            min:
+              type: number
+            max:
+              type: number
+            step:
+              type: number
+          additionalProperties: false
+        default:
+          type: [string, number, boolean]
+          description: >
+            The value used when the request leaves the option out. Absent: the
+            option is sent only when the request sends it, and the model uses
+            its own value.
+        required:
+          type: boolean
+          enum: [true]
+          description: >
+            `true`: the request must send the option. A request without it
+            returns HTTP 400 `missing_required_parameter`, before anything is
+            charged.
+        free:
+          type: object
+          description: >
+            `size` only: the other sizes the model takes, inside these rules,
+            besides `values`.
+          properties:
+            multiple_of:
+              type: integer
+              description: Each side is a multiple of this number.
+            min_edge:
+              type: integer
+              description: The shortest each side can be, in pixels.
+            max_edge:
+              type: integer
+              description: The longest each side can be, in pixels.
+            min_ratio:
+              type: number
+              description: The smallest long side to short side ratio.
+            max_ratio:
+              type: number
+              description: >
+                The largest long side to short side ratio (3 takes 1:3 to 3:1).
+            min_pixels:
+              type: integer
+              description: The fewest pixels (width x height).
+            max_pixels:
+              type: integer
+              description: The most pixels (width x height).
+            when:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: [string, number]
+              description: >
+                The rules apply only while these options hold one of the listed
+                values: option field names as keys, for example
+                `{"aspect_ratio": ["custom"]}`.
+          additionalProperties: false
+        max_length:
+          type: integer
+          description: The longest text the option takes, in characters.
+        endpoints:
+          type: array
+          items:
+            type: string
+            enum: [generations, edits]
+          description: >
+            The endpoints the option applies on. Absent: every endpoint the
+            model is served on.
+        send_when:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: [string, number]
+          description: >
+            The option applies only while these options hold one of the listed
+            values: option field names as keys, for example
+            `{"output_format": ["jpeg", "webp"]}` on `output_compression`.
+        schema:
+          type: object
+          additionalProperties: true
+          description: >
+            `structured` options only: the JSON Schema the value follows, a
+            subset with the keywords `type`, `items`, `minItems`, `maxItems`,
+            `properties`, `required`, `minimum`, `maximum`, `maxLength` and
+            `enum`. An object takes only the keys its `properties` list.
+        length_matches:
+          type: string
+          enum: [input_images]
+          description: >
+            `structured` options only: `input_images` when the value is a list
+            with one entry per input image of the edit, in the order of the
+            images.
+      additionalProperties: false
+      example:
+        field: regions
+        kind: structured
+        endpoints: [edits]
+        schema:
+          type: array
+          items:
+            type: array
+            minItems: 4
+            maxItems: 4
+            items:
+              type: integer
+              minimum: 0
+        length_matches: input_images
+
+    ImageParamsInputs:
+      type: object
+      description: >
+        What an edit takes besides the prompt. Each key is present only when it
+        applies to the model.
+      properties:
+        image:
+          type: object
+          description: >
+            The input images of an edit: at least `min` and at most `max`.
+          required: [min, max]
+          properties:
+            min:
+              type: integer
+            max:
+              type: integer
+            roles:
+              type: array
+              items:
+                type: string
+                enum: [source, reference]
+              description: >
+                The role of each image by position, when the model tells them
+                apart: `source`, an image the edit changes, or `reference`, an
+                image that guides the edit.
+            max_pixels:
+              type: integer
+              description: >
+                The most pixels each input image can have. A larger image
+                returns HTTP 400 `invalid_value` before anything is charged.
+            max_edge:
+              type: integer
+              description: >
+                The longest side each input image can have, in pixels. A larger
+                image returns HTTP 400 `invalid_value` before anything is
+                charged.
+          additionalProperties: false
+        mask:
+          type: boolean
+          enum: [true]
+          description: '`true`: the model takes `mask`.'
+        markup:
+          type: boolean
+          enum: [true]
+          description: '`true`: the model takes `markup`.'
+        mask_required:
+          type: boolean
+          enum: [true]
+          description: >
+            `true`: every edit needs `mask`; an edit without it returns HTTP 400
+            `missing_required_parameter`.
+        mask_max_images:
+          type: integer
+          description: The model takes `mask` with up to this many input images.
+        mask_format:
+          type: string
+          enum: [alpha, black_and_white]
+          description: >
+            The mask format the model takes, listed only when the model states
+            it: `alpha`, a PNG whose transparent areas mark the part to edit, or
+            `black_and_white`, a black-and-white image where white marks the
+            part to edit and black the part to keep.
+      additionalProperties: false
 
     ModelPricing:
       type: object

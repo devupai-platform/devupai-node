@@ -1,4 +1,4 @@
-import type { APIClient, RequestOptions } from "../core/client";
+import { BILLED_POST_RETRY, type APIClient, type RequestOptions } from "../core/client";
 import type { APIPromise } from "../core/api-promise";
 import type {
     VideoEditCreateParams,
@@ -87,6 +87,7 @@ export class VideoGenerations extends APIResource {
                 body,
                 auth: true,
                 options: requestOptions,
+                retry: BILLED_POST_RETRY,
             });
         }
         const form = new FormData();
@@ -97,6 +98,7 @@ export class VideoGenerations extends APIResource {
             body: form,
             auth: true,
             options: requestOptions,
+            retry: BILLED_POST_RETRY,
         });
     }
 }
@@ -151,6 +153,7 @@ export class VideoEdits extends APIResource {
             body: form,
             auth: true,
             options: requestOptions,
+            retry: BILLED_POST_RETRY,
         });
     }
 }

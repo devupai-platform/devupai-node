@@ -2,7 +2,9 @@
  * Public request and response types of the DEVUP AI API.
  *
  * Every type here is an alias of the schema generated from the OpenAPI document
- * (`src/internal/openapi-schema.ts`, produced by `npm run generate:types`).
+ * (`src/internal/openapi-schema.ts`, produced by `npm run generate:types`). A schema that
+ * takes additional properties (a model's own options) is narrowed with `OmitKnown`, never
+ * with the built-in `Omit`, so its named fields keep their types.
  * Fields that carry files in multipart requests are typed as `Blob | File | Uint8Array`.
  */
 
@@ -12,6 +14,14 @@ type Schemas = components["schemas"];
 
 /** A file sent in a multipart request. */
 type BinaryInput = Blob | File | Uint8Array;
+
+/**
+ * Removes the named keys `K` from `T` and keeps everything else, including an index
+ * signature. The built-in `Omit` maps over `keyof T`, which an index signature widens to
+ * `string | number`: the named fields would then lose their types (`model` would become an
+ * optional `unknown`). This key-remapping form keeps them.
+ */
+type OmitKnown<T, K extends PropertyKey> = { [P in keyof T as P extends K ? never : P]: T[P] };
 
 // ---------------------------------------------------------------------------
 // Shared
@@ -148,7 +158,13 @@ export type RerankCreateResponse = Schemas["RerankResponse"];
 // Images
 // ---------------------------------------------------------------------------
 
-/** The request body of `POST /v1/images/generations` (JSON). */
+/**
+ * The request body of `POST /v1/images/generations` (JSON).
+ *
+ * Besides the fields listed here, a model can take options of its own, listed in
+ * `image_params.options` of its model object ({@link ImageParams}): send each one under its
+ * own name. A structured option (`kind` `structured`) is sent as a JSON value.
+ */
 export type ImageGenerateParams = Schemas["ImageGenerationRequest"];
 
 /** The response of an image generation or edit. */
@@ -160,21 +176,65 @@ export type ImageInputUrl = Schemas["ImageInputUrl"];
 /**
  * The fields of an image edit sent as JSON to `POST /v1/images/edits`: every input image
  * (`images`, `image`, `mask`, `markup`) is an HTTPS URL or a data URI, as a string or as `{ image_url }`.
+ * A model's own options ({@link ImageParams}) are sent under their own names; a structured
+ * option is sent as a JSON value.
  */
 export type ImageEditJsonParams = Schemas["ImageEditJsonRequest"];
 
 /** One input of a multipart image edit: a file, or an HTTPS URL or data URI as text. */
 export type ImageEditInput = BinaryInput | string;
 
-/** The fields of an image edit sent as `multipart/form-data` to `POST /v1/images/edits`. */
-export type ImageEditParams = Omit<Schemas["ImageEditRequest"], "image" | "mask" | "markup"> & {
-    /** The image to edit, or several images in order; the first is the one a mask or markup applies to. */
+/**
+ * The fields of an image edit sent as `multipart/form-data` to `POST /v1/images/edits`.
+ *
+ * A model's own options ({@link ImageParams}) are sent under their own names, as text
+ * fields: a switch as `true` or `false`, a number as decimal text, and a structured option
+ * (an object or a list) as one field whose value is its JSON text.
+ */
+export type ImageEditParams = OmitKnown<Schemas["ImageEditRequest"], "image" | "mask" | "markup"> & {
+    /**
+     * The image to edit, or several images in order; the first is the one a mask or markup
+     * applies to. On some models the first image is edited and the others guide the edit:
+     * `image_params.inputs.image.roles` of the model gives the role of each position
+     * (`source` or `reference`), and `inputs.image.min` / `max` how many images it takes.
+     */
     image?: ImageEditInput | ImageEditInput[];
-    /** Optional mask for inpainting. */
+    /**
+     * A mask with the same width and height as the first image, marking the part to edit.
+     * Only some models take a mask (`image_params.inputs.mask`); some need one on every
+     * edit (`inputs.mask_required`). The format is the one the model lists in
+     * `inputs.mask_format`: `alpha`, a PNG whose transparent areas mark the part to edit,
+     * or `black_and_white`, an image where white marks the part to edit and black the part
+     * to keep. Not with `markup`.
+     */
     mask?: ImageEditInput;
-    /** Optional markup drawn over the first image. */
+    /**
+     * On models that take it (`image_params.inputs.markup`): a transparent PNG with the same
+     * width and height as the first image, with marks drawn over it that show the edit. Not
+     * with `mask`.
+     */
     markup?: ImageEditInput;
 };
+
+/**
+ * The image options of a model (`image_params` of {@link ModelObject}): the image endpoints
+ * it is served on, the options it takes with the values it accepts, the input images an
+ * edit takes, and how it takes a prompt. Present on models that list image options.
+ */
+export type ImageParams = Schemas["ImageParams"];
+
+/**
+ * One option of a model in `image_params.options`. Without `kind`, it is a field of
+ * {@link ImageGenerateParams}; with `kind`, it is an option of the model's own, sent under
+ * the name in `field`.
+ */
+export type ImageParamsOption = Schemas["ImageParamsOption"];
+
+/**
+ * What an image edit takes besides the prompt (`image_params.inputs`): how many input
+ * images and their roles, whether a mask or markup is taken or needed, and the mask format.
+ */
+export type ImageParamsInputs = Schemas["ImageParamsInputs"];
 
 // ---------------------------------------------------------------------------
 // Audio
@@ -270,7 +330,7 @@ export type VideoGenerationResponse = Schemas["VideoGenerationResponse"];
 // Models, account and health
 // ---------------------------------------------------------------------------
 
-/** One model of `GET /v1/models`. */
+/** One model of `GET /v1/models`. On models that list image options, `image_params` gives them ({@link ImageParams}). */
 export type ModelObject = Schemas["ModelObject"];
 
 /** The response of `GET /v1/models`. */

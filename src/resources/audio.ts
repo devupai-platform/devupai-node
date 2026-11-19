@@ -1,4 +1,4 @@
-import type { APIClient, RequestOptions } from "../core/client";
+import { BILLED_POST_RETRY, type APIClient, type RequestOptions } from "../core/client";
 import type { APIPromise } from "../core/api-promise";
 import type {
     SpeechCreateParams,
@@ -30,6 +30,7 @@ export class Speech extends APIResource {
             body,
             auth: true,
             options: requestOptions,
+            retry: BILLED_POST_RETRY,
         });
     }
 }
@@ -97,6 +98,7 @@ export class Transcriptions extends APIResource {
             body: form,
             auth: true,
             options: requestOptions,
+            retry: BILLED_POST_RETRY,
         };
         if (isTextFormat(body.response_format)) {
             return this._client.text(request);

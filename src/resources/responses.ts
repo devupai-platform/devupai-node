@@ -1,4 +1,4 @@
-import type { RequestOptions, StreamConfig } from "../core/client";
+import { BILLED_POST_RETRY, type RequestOptions, type StreamConfig } from "../core/client";
 import type { APIPromise } from "../core/api-promise";
 import type { Stream } from "../core/streaming";
 import type {
@@ -82,6 +82,7 @@ export class Responses extends APIResource {
             body,
             auth: true,
             options: requestOptions,
+            retry: BILLED_POST_RETRY,
         };
         if (body.stream === true) {
             return this._client.stream<ResponseStreamEvent>(request, responsesStreamConfig);
