@@ -53,7 +53,7 @@
     "url": "https://github.com/devupai-platform/devupai-node/issues"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.0.0"
   },
   "peerDependencies": {
     "@ai-sdk/openai-compatible": ">=3.0.0 <4.0.0",

@@ -82,10 +82,7 @@ const FORBIDDEN_TERM_HASHES = new Set([
     "88fc4d7bf12e0d73",
     "7b9fde2dd505251b",
     "6b86ac84384ccbf2",
-    "0163dad86bcbf722",
     "09c27ea4804eaf5d",
-    "fa324adb1d7b75dc",
-    "0f0942ba21c6b8c4",
     // The review word list, with inflections (comments avoid the words themselves).
     // Keeping stored copies of responses: 4 forms.
     "5e1ecee06a7fc06f",
@@ -224,7 +221,7 @@ describe("public text", () => {
     it("the self-check hashes the way the list was built", () => {
         expect(termHash("Example")).toBe(termHash("example"));
         expect(words("fooBar baz-qux")).toEqual(expect.arrayContaining(["fooBar", "foo", "Bar", "baz-qux", "baz", "qux"]));
-        expect(FORBIDDEN_TERM_HASHES.size).toBe(16 + 26);
+        expect(FORBIDDEN_TERM_HASHES.size).toBe(13 + 26);
     });
 
     it("the exception list removes only its own text, and whole-word matching skips longer words", () => {

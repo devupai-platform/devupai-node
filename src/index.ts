@@ -101,6 +101,7 @@ export {
     NotFoundError,
     ConflictError,
     PayloadTooLargeError,
+    UnsupportedMediaTypeError,
     UnprocessableEntityError,
     RateLimitError,
     InternalServerError,

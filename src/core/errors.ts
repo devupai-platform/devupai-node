@@ -154,7 +154,10 @@ export class NotFoundError extends DevupAPIError {
     }
 }
 
-/** HTTP 409: the request could not be completed. Retry later or contact support. */
+/**
+ * HTTP 409: the outcome of this request is not confirmed yet (`request_outcome_pending`).
+ * Do not send it again: contact support with `requestId`.
+ */
 export class ConflictError extends DevupAPIError {
     constructor(...args: ConstructorParameters<typeof DevupAPIError>) {
         super(...args);
@@ -167,6 +170,17 @@ export class PayloadTooLargeError extends DevupAPIError {
     constructor(...args: ConstructorParameters<typeof DevupAPIError>) {
         super(...args);
         this.name = "PayloadTooLargeError";
+    }
+}
+
+/**
+ * HTTP 415: the model does not accept the content type of the request. Check the `Content-Type` header and the
+ * body format against the API reference.
+ */
+export class UnsupportedMediaTypeError extends DevupAPIError {
+    constructor(...args: ConstructorParameters<typeof DevupAPIError>) {
+        super(...args);
+        this.name = "UnsupportedMediaTypeError";
     }
 }
 
@@ -186,7 +200,10 @@ export class RateLimitError extends DevupAPIError {
     }
 }
 
-/** HTTP 500 or above: the request could not be completed. Retry later or contact support. */
+/**
+ * HTTP 500 or above. After a 500 or 502 (`server_error`, `DEVUP_COMPUTE_ERROR`) the request may already have
+ * been processed and billed: check its outcome before sending it again.
+ */
 export class InternalServerError extends DevupAPIError {
     constructor(...args: ConstructorParameters<typeof DevupAPIError>) {
         super(...args);
@@ -227,6 +244,7 @@ export function makeAPIError(
     if (status === 404) return new NotFoundError(status, message, errorData, headers);
     if (status === 409) return new ConflictError(status, message, errorData, headers);
     if (status === 413) return new PayloadTooLargeError(status, message, errorData, headers);
+    if (status === 415) return new UnsupportedMediaTypeError(status, message, errorData, headers);
     if (status === 422) return new UnprocessableEntityError(status, message, errorData, headers);
     if (status === 429) return new RateLimitError(status, message, errorData, headers);
     if (status >= 500) return new InternalServerError(status, message, errorData, headers);

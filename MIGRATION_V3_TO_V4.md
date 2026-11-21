@@ -41,6 +41,8 @@ package.
 "engines": { "node": ">=22.12.0" }
 ```
 
+From 4.3.0, `engines.node` is `>=22.0.0`: every Node.js 22 release is supported.
+
 ## 2. One stream chunk type
 
 `ChatCompletionChunk` is now one type. `ChatCompletionBillingChunk` is removed,

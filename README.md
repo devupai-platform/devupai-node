@@ -123,7 +123,7 @@ Upgrading from 3.x? Read [MIGRATION_V3_TO_V4.md](https://github.com/devupai-plat
 | **OpenAI-compatible API**      | Use familiar request shapes and migration patterns.                                      |
 | **Multimodal inference**       | Access text, images, embeddings, audio, video, and specialized models from one SDK.      |
 | **TypeScript-first contracts** | Request and response types generated from the DEVUP AI OpenAPI specification.            |
-| **Modern runtime support**     | Node.js 22.12 or later, built on the standard `fetch`, `AbortSignal`, and Web Crypto.    |
+| **Modern runtime support**     | Node.js 22 or later, built on the standard `fetch`, `AbortSignal`, and Web Crypto.       |
 | **Vercel AI SDK integration**  | Use `generateText`, `streamText`, Next.js handlers, and UI streaming through `devupai/ai`. |
 | **Operational visibility**     | Request IDs, response headers, models, account balance, health, and billing metadata.    |
 
@@ -131,7 +131,7 @@ Upgrading from 3.x? Read [MIGRATION_V3_TO_V4.md](https://github.com/devupai-plat
 
 ## Requirements
 
-- Node.js **22.12.0** or later.
+- Node.js **22.0.0** or later.
 - For `devupai/ai`: the peers `@ai-sdk/openai-compatible` 3 and `@ai-sdk/provider` 4. The integration requires `ai` 7 in your app and is ESM-only.
 
 ---
@@ -1229,7 +1229,7 @@ lets you rotate secrets without downtime.
 
 - **ESM-only:** use `import`, not `require`.
 - **Peers:** `@ai-sdk/openai-compatible` 3 and `@ai-sdk/provider` 4. The integration requires `ai` 7 in your app.
-- **Node.js:** 22.12 or later.
+- **Node.js:** 22 or later.
 
 ```bash
 npm install devupai ai @ai-sdk/openai-compatible @ai-sdk/provider
@@ -1555,7 +1555,8 @@ request was answered.
 The `DevupAI` client retries a request up to `maxRetries` times (default 2).
 Calls made through `devupai/ai` follow the AI SDK's retries instead (see
 [Vercel AI SDK](#vercel-ai-sdk)). When the
-answer has a `Retry-After` header, the SDK waits that long before the next
+answer has a `Retry-After` (or `retry-after-ms`) header, the SDK waits that
+long before the next
 attempt; otherwise it waits a random time that grows with each attempt, up to
 60 seconds. A wait that does not fit in the remaining `timeout` ends the call
 with the error. A 500 answer is not retried.
@@ -1570,6 +1571,11 @@ request may have been sent, is returned to you without a retry, because the
 request may already have been processed and charged. Earlier versions retried
 these on every request. `maxRetries` applies to both groups, and
 `maxRetries: 0` turns retries off.
+
+On billed requests, a 429 or 503 answer is sent again after the wait described
+above, up to `maxRetries` times. This includes a
+503 whose message asks you to contact support before repeating the request.
+To check the request's outcome first, set `maxRetries: 0` on that call.
 
 ```typescript
 import DevupAI from "devupai";
@@ -1652,23 +1658,26 @@ the HTTP status, so you can catch a specific case or the base class.
 | `PaymentRequiredError`  | 402         | The balance does not cover the request (`insufficient_balance`), or a scoped credential reached its budget (`budget_exhausted`). |
 | `PermissionDeniedError` | 403         | The key cannot use this resource. From `images.download()`: the link has expired; generate the file again. |
 | `NotFoundError`         | 404         | For example, an unknown model.                                     |
-| `ConflictError`         | 409         | The request could not be completed. Retry later or contact support. |
+| `ConflictError`         | 409         | The outcome of this request is not confirmed yet (`request_outcome_pending`). Do not send it again: contact support with `requestId`. |
 | `PayloadTooLargeError`  | 413         | The request body is larger than the limit (`payload_too_large`). See [Request Size Limits](#request-size-limits). |
+| `UnsupportedMediaTypeError` | 415     | The model does not accept the content type of the request (`invalid_request_error`, or a more specific `code`). Send the `Content-Type` and body format that the API reference lists for the endpoint. |
 | `UnprocessableEntityError` | 422      | The request was not accepted in its current form.                  |
 | `RateLimitError`        | 429         | Read `retryAfterMs` for the suggested wait.                        |
-| `InternalServerError`   | 500 and up  | The request could not be completed. Retry later or contact support. |
+| `InternalServerError`   | 500 and up  | After a 500 or 502 the request may already have been processed and billed: check its outcome before sending it again. |
 | `APIConnectionError`    | `0`         | The API could not be reached.                                      |
 | `APITimeoutError`       | `0`         | The call exceeded `timeout` or `streamIdleTimeout`. Extends `APIConnectionError`. |
-| `DevupAPIError`         | other       | Any other status, for example 415.                                 |
+| `DevupAPIError`         | other       | Any other status.                                                  |
 
 `BadRequestError`, `PaymentRequiredError`, `PayloadTooLargeError`, and
-`UnprocessableEntityError` are new in 4.2.0. Like the other classes, they
-extend `DevupAPIError`, so existing `instanceof DevupAPIError` and
-`error.status` checks keep working. Match `error.code` for the specific
-reason, for example `missing_required_parameter`, `invalid_value`,
-`content_policy_violation`, or `context_length_exceeded` (400),
-`payload_too_large` (413), `model_at_capacity` (429), or
-`reference_audio_not_found` (404).
+`UnprocessableEntityError` are new in 4.2.0, and `UnsupportedMediaTypeError`
+in 4.3.0. Like the other classes, they extend `DevupAPIError`, so existing
+`instanceof DevupAPIError` and `error.status` checks keep working. Match
+`error.code` for the specific reason, for example
+`missing_required_parameter`, `invalid_value`, `content_policy_violation`, or
+`context_length_exceeded` (400), `payload_too_large` (413),
+`model_at_capacity` (429), `reference_audio_not_found` (404),
+`request_outcome_pending` (409), `server_error` (500), or
+`DEVUP_COMPUTE_ERROR` (502).
 
 | Property       | Type                     | Description                                                              |
 | -------------- | ------------------------ | ------------------------------------------------------------------------ |
@@ -1774,7 +1783,7 @@ embeddings `input` up to 2,048 texts. A longer array returns HTTP 400
 # API Behaviour Since 4.1.0
 
 Since the release of `devupai` 4.1.0, the API answers these cases as follows.
-The 4.2.0 types and this README describe them; no method changes its
+The 4.3.0 types and this README describe them; no method changes its
 signature.
 
 - **Image model options:** a model's own options, and `image_params` on the
@@ -1858,7 +1867,7 @@ typedCompletion()
 
 # Runtime and Security
 
-- Node.js 22.12 or later. The core package ships ESM and CommonJS builds;
+- Node.js 22 or later. The core package ships ESM and CommonJS builds;
   `devupai/ai` is ESM-only.
 - Built on the standard `fetch`, `AbortSignal`, and Web Crypto APIs, with zero
   runtime dependencies. Pass `fetch` to use your own implementation.

@@ -1,4 +1,4 @@
-// HTTP 400, 402, 413 and 422 have their own subclasses of DevupAPIError (added in 4.2.0).
+// HTTP 400, 402, 413 and 422 (added in 4.2.0) and 415 (added in 4.3.0) have their own subclasses of DevupAPIError.
 // Every existing `instanceof DevupAPIError` keeps working, and the other statuses keep their class.
 import { describe, expect, it } from "vitest";
 import DevupAI, {
@@ -13,6 +13,7 @@ import DevupAI, {
     PermissionDeniedError,
     RateLimitError,
     UnprocessableEntityError,
+    UnsupportedMediaTypeError,
 } from "../src/index";
 import { makeAPIError } from "../src/core/errors";
 import { MODEL_A, REQ_ID, TEST_KEY, errorResponse, mockFetch } from "./helpers/mock-fetch";
@@ -21,6 +22,7 @@ const NEW_CLASSES = [
     [400, BadRequestError, "BadRequestError", "invalid_value"],
     [402, PaymentRequiredError, "PaymentRequiredError", "insufficient_balance"],
     [413, PayloadTooLargeError, "PayloadTooLargeError", "payload_too_large"],
+    [415, UnsupportedMediaTypeError, "UnsupportedMediaTypeError", "invalid_request_error"],
     [422, UnprocessableEntityError, "UnprocessableEntityError", "missing_required_parameter"],
 ] as const;
 
@@ -43,7 +45,7 @@ function client(status: number, code: string): { client: DevupAI } {
     return { client: new DevupAI({ apiKey: TEST_KEY, fetch: mock.fetch, maxRetries: 0 }) };
 }
 
-describe("error subclasses for 400, 402, 413 and 422", () => {
+describe("error subclasses for 400, 402, 413, 415 and 422", () => {
     it.each(NEW_CLASSES)("status %i gives %o, a DevupAPIError with every field", async (status, cls, name, code) => {
         const err = await client(status, code).client.embeddings.create({ model: MODEL_A, input: "x" }).catch((e: unknown) => e);
         expect(err).toBeInstanceOf(cls);
@@ -70,7 +72,7 @@ describe("error subclasses for 400, 402, 413 and 422", () => {
         expect(e.requestId).toBe(REQ_ID);
     });
 
-    it("the four classes extend DevupAPIError directly and are not instances of one another", () => {
+    it("the five classes extend DevupAPIError directly and are not instances of one another", () => {
         for (const [, cls] of NEW_CLASSES) {
             expect(Object.getPrototypeOf(cls)).toBe(DevupAPIError);
         }
@@ -78,6 +80,10 @@ describe("error subclasses for 400, 402, 413 and 422", () => {
         expect(bad).not.toBeInstanceOf(PaymentRequiredError);
         expect(bad).not.toBeInstanceOf(UnprocessableEntityError);
         expect(bad).not.toBeInstanceOf(PayloadTooLargeError);
+        expect(bad).not.toBeInstanceOf(UnsupportedMediaTypeError);
+        const unsupported = makeAPIError(415, "m", undefined, undefined);
+        expect(unsupported).not.toBeInstanceOf(BadRequestError);
+        expect(unsupported).not.toBeInstanceOf(UnprocessableEntityError);
     });
 
     it.each(OTHER_CLASSES)("status %i keeps %o", async (status, cls, name) => {
@@ -88,8 +94,16 @@ describe("error subclasses for 400, 402, 413 and 422", () => {
         for (const [, newCls] of NEW_CLASSES) expect(err).not.toBeInstanceOf(newCls);
     });
 
+    it("a 415 on a billed call is returned after one attempt, also with retries on", async () => {
+        const mock = mockFetch(() => errorResponse(415, "invalid_request_error", "Fixture message.", { "x-request-id": REQ_ID }));
+        const api = new DevupAI({ apiKey: TEST_KEY, fetch: mock.fetch, maxRetries: 2 });
+        const err = await api.embeddings.create({ model: MODEL_A, input: "x" }).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(UnsupportedMediaTypeError);
+        expect(mock.calls).toHaveLength(1);
+    });
+
     it("an unmapped status stays a plain DevupAPIError", () => {
-        for (const status of [405, 410, 415, 418]) {
+        for (const status of [405, 410, 418]) {
             const e = makeAPIError(status, "m", undefined, undefined);
             expect(e.constructor).toBe(DevupAPIError);
             expect(e.name).toBe("DevupAPIError");
