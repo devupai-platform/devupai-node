@@ -86,6 +86,13 @@ function typeChecks(client: DevupAI): void {
     // ModelObject.owned_by is a plain string.
     expectTypeOf<ModelObject["owned_by"]>().toEqualTypeOf<string>();
 
+    // ModelObject.family (4.3.0) is an optional string: present only for a model that belongs to a family.
+    expectTypeOf<ModelObject["family"]>().toEqualTypeOf<string | undefined>();
+    const withoutFamily: Pick<ModelObject, "family"> = {};
+    const withFamily: Pick<ModelObject, "family"> = { family: "fixture-family" };
+    expectTypeOf(withoutFamily.family).toEqualTypeOf<string | undefined>();
+    expectTypeOf(withFamily.family).toEqualTypeOf<string | undefined>();
+
     // Rerank: return_documents is optional.
     const rerank: RerankCreateParams = { model: MODEL_B, query: "q", documents: ["a"] };
     void client.rerank.create(rerank);

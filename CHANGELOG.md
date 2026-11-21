@@ -3,6 +3,33 @@
 All notable changes to the `devupai` package are listed here. Earlier 3.x
 entries are in [docs/v3/CHANGELOG_V3.md](https://github.com/devupai-platform/devupai-node/blob/main/docs/v3/CHANGELOG_V3.md).
 
+## [4.3.0]
+
+No breaking changes. An HTTP 415 answer is now an
+`UnsupportedMediaTypeError`, so its `name` is `UnsupportedMediaTypeError`
+instead of `DevupAPIError`; it is still an instance of `DevupAPIError`.
+
+### Added
+
+- `UnsupportedMediaTypeError` for HTTP 415 answers. It extends
+  `DevupAPIError`, so existing `instanceof DevupAPIError` checks keep working.
+- `family` on model objects: a short key for the model's family, present when
+  the model belongs to one.
+
+### Changed
+
+- Type descriptions and examples match the current API reference, including
+  HTTP 413 on `audio.speech.create()` and `inference.run()`, and the
+  documented error codes `DEVUP_COMPUTE_ERROR` (502), `server_error` (500)
+  and `request_outcome_pending` (409).
+- Supports every Node.js 22 release: `engines.node` is now `>=22.0.0` (was
+  `>=22.12.0`).
+
+### Docs
+
+- The `ConflictError` and `InternalServerError` descriptions now say when to
+  check a request's outcome before sending it again.
+
 ## [4.2.0]
 
 No breaking changes to method signatures. Retries on billed requests are

@@ -35,6 +35,8 @@ tags:
     description: OpenAI-compatible chat completions (streaming and non-streaming).
   - name: Responses
     description: OpenAI-compatible Responses API for modern request/response interactions with any text model in the catalog (streaming and non-streaming).
+  - name: Messages
+    description: An endpoint compatible with the Messages API request and response format, for clients and tools built for that format (streaming and non-streaming).
   - name: Embeddings
     description: Generate embedding vectors from text.
   - name: Reranking
@@ -569,6 +571,405 @@ paths:
           $ref: '#/components/responses/RequestNotCompleted'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Messages
+  # ─────────────────────────────────────────────────────────────────────────
+  /anthropic/v1/messages:
+    post:
+      operationId: createMessage
+      summary: Create a message
+      description: >
+        An endpoint compatible with the Messages API request and response format,
+        for clients and tools built for that format: with the base URL set to
+        `https://api.devupai.com/anthropic`, they send their requests to this path.
+        It accepts the text models that `POST /v1/chat/completions` accepts, by
+        their exact `id` from `GET /v1/models`; a name that is not in the catalog
+        returns HTTP 404 `not_found_error`. Usage is billed per token, as on
+        `POST /v1/chat/completions`. Supports streaming via `stream: true`
+        (Server-Sent Events). The request body can be up to 10,485,760 bytes
+        (10 MiB). Authenticate with the API key in the `x-api-key` header or as
+        `Authorization: Bearer`; when both are sent, `x-api-key` is used.
+        Replies and errors use the Messages format: an error body is a
+        `MessagesErrorResponse`, not an `ErrorResponse`.
+      tags: [Messages]
+      security:
+        - ApiKeyHeader: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessagesRequest'
+            example:
+              model: deepseek-ai/DeepSeek-V4-Pro
+              max_tokens: 256
+              messages:
+                - role: user
+                  content: Hello from Algeria!
+      responses:
+        '200':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+            X-DEVUP-Warnings:
+              $ref: '#/components/headers/XDevupWarnings'
+          description: >
+            The model's reply: a `MessagesResponse` JSON object, or a Server-Sent
+            Events stream when the request sets `stream: true`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesResponse'
+              example:
+                id: msg_79037612-d7c2-43e0-8494-c560f97c61ea
+                type: message
+                role: assistant
+                model: deepseek-ai/DeepSeek-V4-Pro
+                content:
+                  - type: text
+                    text: Hello! How can I help you today?
+                stop_reason: end_turn
+                stop_sequence: null
+                usage:
+                  input_tokens: 10
+                  output_tokens: 8
+            text/event-stream:
+              schema:
+                description: >
+                  Server-Sent Events stream. Each event has an `event:` line with the
+                  event type and a `data:` line with one `MessagesStreamEvent` of the
+                  same `type`: first `message_start`; then, for each content block,
+                  `content_block_start`, its `content_block_delta` events
+                  (`text_delta` for text, `input_json_delta` for tool input) and
+                  `content_block_stop`; then `message_delta` with the `stop_reason`,
+                  and `message_stop`. If the reply cannot be completed after the
+                  stream has started, the stream ends without `message_delta` and
+                  `message_stop`; an `error` event whose data is a
+                  `MessagesErrorResponse` is sent when the stream itself cannot be
+                  read. An error before the first event is answered with its HTTP status and
+                  a `MessagesErrorResponse` body instead of a stream.
+                oneOf:
+                  - $ref: '#/components/schemas/MessagesStreamEvent'
+                  - $ref: '#/components/schemas/MessagesErrorResponse'
+        '400':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          description: >
+            Invalid request body or parameters (`invalid_request_error`): for
+            example a body that is not valid JSON, a missing `model` or `messages`,
+            a `max_tokens` above the model's `max_output_tokens`, or a feature the
+            model does not support.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              examples:
+                invalid_json:
+                  summary: The request body is not valid JSON
+                  value:
+                    type: error
+                    error:
+                      type: invalid_request_error
+                      message: Request body must be valid JSON.
+                missing_model:
+                  summary: Missing model field
+                  value:
+                    type: error
+                    error:
+                      type: invalid_request_error
+                      message: The 'model' field is required.
+                missing_messages:
+                  summary: Missing messages field
+                  value:
+                    type: error
+                    error:
+                      type: invalid_request_error
+                      message: The 'messages' field is required and must be an array.
+                invalid_max_tokens:
+                  summary: max_tokens above the model's max_output_tokens (N here)
+                  value:
+                    type: error
+                    error:
+                      type: invalid_request_error
+                      message: max_tokens must be between 1 and N.
+                tools_not_supported:
+                  summary: The model does not support tool calling
+                  value:
+                    type: error
+                    error:
+                      type: invalid_request_error
+                      message: This model does not support tool calling. Remove tools and tool_choice from the request.
+        '401':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          description: >
+            No API key, or a key that is invalid, deactivated, expired or revoked
+            (`authentication_error`). Send the key in the `x-api-key` header or as
+            `Authorization: Bearer`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              examples:
+                missing_api_key:
+                  summary: No API key in the request
+                  value:
+                    type: error
+                    error:
+                      type: authentication_error
+                      message: 'Provide your API key via the x-api-key header or Authorization: Bearer token.'
+                invalid_api_key:
+                  summary: Invalid or deactivated API key
+                  value:
+                    type: error
+                    error:
+                      type: authentication_error
+                      message: The API key provided is invalid or has been deactivated.
+        '402':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          description: >
+            The account balance, or a scoped token's budget, does not cover the
+            request (`invalid_request_error`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              example:
+                type: error
+                error:
+                  type: invalid_request_error
+                  message: Your balance is depleted. Top up at https://devupai.com/dashboard/billing.
+        '403':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          description: >
+            The key may not make this request (`permission_error`): for example a
+            suspended account, or a scoped token that does not grant the model.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              example:
+                type: error
+                error:
+                  type: permission_error
+                  message: 'This scoped token does not grant access to model "deepseek-ai/DeepSeek-V4-Pro". Allowed: meta-llama/Llama-3.3-70B-Instruct'
+        '404':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          description: >
+            The model is not in the catalog (`not_found_error`). The name is never
+            matched to another model.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              example:
+                type: error
+                error:
+                  type: not_found_error
+                  message: The requested model was not found.
+        '409':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          description: >
+            The outcome of this request is not known yet. It needs confirmation
+            before the operation is sent again (`invalid_request_error`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              example:
+                type: error
+                error:
+                  type: invalid_request_error
+                  message: The outcome of this request must be confirmed before it can be repeated. Contact support with the request ID.
+        '413':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          description: >
+            The request body is larger than 10,485,760 bytes (10 MiB)
+            (`request_too_large`). Base64-encoded image data counts toward this
+            limit. The body is not processed and the request is not charged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              example:
+                type: error
+                error:
+                  type: request_too_large
+                  message: The request body exceeds the limit of 10,485,760 bytes (10 MiB). Base64-encoded file data counts toward this limit.
+        '415':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          description: The content of the request is not supported by this model (`invalid_request_error`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              example:
+                type: error
+                error:
+                  type: invalid_request_error
+                  message: The content type of the request is not supported by this model.
+        '422':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          description: The request was not accepted in its current form (`invalid_request_error`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              example:
+                type: error
+                error:
+                  type: invalid_request_error
+                  message: One or more parameters are invalid. Check the API reference.
+        '429':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying.
+            retry-after-ms:
+              schema:
+                type: integer
+              description: Milliseconds to wait before retrying, for the limits that send it.
+          description: >
+            Too many requests (`rate_limit_error`): the account's per-minute,
+            concurrency or tokens-per-minute limit. Wait the number of seconds in
+            `Retry-After` before retrying. A model that is momentarily at capacity
+            is answered with HTTP 529 instead.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              example:
+                type: error
+                error:
+                  type: rate_limit_error
+                  message: Rate limit exceeded. Please slow down your requests and try again shortly.
+        '500':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          description: The request did not complete (`api_error`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              example:
+                type: error
+                error:
+                  type: api_error
+                  message: The cost of this request could not be calculated. The request was not billed. Contact support with the request ID.
+        '502':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+          description: The model did not complete the request (`api_error`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              example:
+                type: error
+                error:
+                  type: api_error
+                  message: The model could not complete this request.
+        '503':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying.
+            retry-after-ms:
+              schema:
+                type: integer
+              description: Milliseconds to wait before retrying, when sent.
+          description: >
+            The model is temporarily unavailable, or requests are paused for a few
+            seconds (`api_error`). Retry after the delay in `Retry-After`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              example:
+                type: error
+                error:
+                  type: api_error
+                  message: The requested model is temporarily unavailable. Retry shortly.
+        '529':
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+            x-client-request-id:
+              $ref: '#/components/headers/XClientRequestId'
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying (5).
+            retry-after-ms:
+              schema:
+                type: integer
+              description: Milliseconds to wait before retrying (5000).
+          description: >
+            The model is momentarily at capacity (`overloaded_error`). Retry after
+            the delay in `Retry-After`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesErrorResponse'
+              example:
+                type: error
+                error:
+                  type: overloaded_error
+                  message: This model is currently at capacity. Retry in a few seconds.
 
   # ─────────────────────────────────────────────────────────────────────────
   # Embeddings
@@ -1713,6 +2114,13 @@ paths:
                       message: 'The "input" field is required (text to synthesize).'
                       type: devup_error
                       code: missing_input
+                invalid_response_format:
+                  summary: response_format is not one of the audio formats (not charged)
+                  value:
+                    error:
+                      message: 'response_format must be one of: mp3, opus, aac, flac, wav, pcm.'
+                      type: devup_error
+                      code: invalid_response_format
                 reference_audio_required:
                   summary: referenceAudioUrl required by this model
                   value:
@@ -1754,8 +2162,9 @@ paths:
             x-client-request-id:
               $ref: '#/components/headers/XClientRequestId'
           description: >
-            The requested model identifier was not found in the catalog, or no
-            endpoint exists at the method and path, or, on a model that clones a
+            The requested model is not listed on `GET /v1/models`, or is not
+            available, or no endpoint exists at the method and path, or, on a
+            model that clones a
             voice, `referenceAudioUrl` names a reference clip that is not one of
             this account's clips or is no longer available
             (`reference_audio_not_found`, not charged). It is not retryable unless
@@ -1789,6 +2198,8 @@ paths:
                       code: reference_audio_not_found
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '415':
           $ref: '#/components/responses/UnprocessableRequest'
         '422':
@@ -1804,21 +2215,19 @@ paths:
             x-client-request-id:
               $ref: '#/components/headers/XClientRequestId'
           description: |
-            The request could not be completed. Retry later or contact support.
-
-            The example body is illustrative: `request_failed` is an example value of `error.code`.
+            The model did not complete this request, or its response could not be read or did not contain audio (`DEVUP_COMPUTE_ERROR`). On a model that clones a voice, the code is `voice_registration_failed` when the reference audio could not be registered. See https://docs.devupai.com/docs/errors#error-DEVUP_COMPUTE_ERROR.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
-                request_failed:
-                  summary: Example body (`request_failed` is an example code)
+                DEVUP_COMPUTE_ERROR:
+                  summary: The model's response could not be read
                   value:
                     error:
-                      message: The request could not be completed. Retry later or contact support.
+                      message: The model's response could not be read.
                       type: devup_error
-                      code: request_failed
+                      code: DEVUP_COMPUTE_ERROR
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
@@ -2440,6 +2849,12 @@ paths:
                     Optional callback URL for asynchronous delivery of inference
                     results. This field is honoured on this native inference
                     endpoint only; it has no effect on the OpenAI-compatible endpoints.
+                    It must be a public HTTPS URL: `https://`, no user name or
+                    password, and a host that is a public IP address or a host
+                    name that resolves to public addresses. Any port can be used.
+                    Any other value returns HTTP 400 `invalid_webhook_url` before
+                    anything is reserved or charged. `null` or an empty string
+                    means no webhook: the result is returned in the response.
               additionalProperties: true
             example:
               input: Hello from Algeria!
@@ -2507,6 +2922,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '415':
           $ref: '#/components/responses/UnprocessableRequest'
         '422':
@@ -2805,8 +3222,8 @@ webhooks:
         The first delivery arrives within about a minute of completion. When your
         endpoint answers HTTP 408, 429 or 5xx, times out, or cannot be reached, the
         same delivery (same `X-DevUp-Delivery-Id`) is sent again, up to 8 attempts
-        in all over about one hour. Any other 4xx response (such as 401 or 404)
-        ends delivery.
+        in all, with up to 30 minutes between attempts, about 2 hours in total.
+        Any other 4xx response (such as 401 or 404) ends delivery.
       parameters:
         - name: X-DevUp-Signature
           in: header
@@ -2979,8 +3396,10 @@ components:
       name: x-api-key
       description: >
         API key passed in the `x-api-key` header. Accepted on `GET /v1/models`,
-        `GET /v1/models/{model}`, `GET /v1/me` and `GET /v1/me/avatar`. When both
-        `Authorization` and `x-api-key` are sent, `Authorization` is used.
+        `GET /v1/models/{model}`, `GET /v1/me`, `GET /v1/me/avatar` and
+        `POST /anthropic/v1/messages`. When both `Authorization` and `x-api-key`
+        are sent, `Authorization` is used, except on `POST /anthropic/v1/messages`,
+        where `x-api-key` is used.
 
   # ─────────────────────────────────────────────────────────────────────────
   # Shared response headers
@@ -2990,8 +3409,8 @@ components:
       description: >
         DEVUP's unique identifier for this request, generated by DEVUP (it
         starts with `req_`). Returned on every response, success or error,
-        from every `/v1` endpoint and from the Anthropic-compatible messages
-        endpoint. The dashboard shows the same ID for billed requests; quote
+        from every `/v1` endpoint and from the Messages-compatible endpoint.
+        The dashboard shows the same ID for billed requests; quote
         it when you contact support. Readable from browsers (listed in
         `Access-Control-Expose-Headers`). Not returned by `/health`.
       schema:
@@ -3034,11 +3453,28 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              message: 'The "model" field is required.'
-              type: devup_error
-              code: missing_model
+          examples:
+            missing_model:
+              summary: Missing model field
+              value:
+                error:
+                  message: 'The "model" field is required.'
+                  type: devup_error
+                  code: missing_model
+            invalid_webhook_url:
+              summary: webhook is not a public HTTPS URL (not charged)
+              value:
+                error:
+                  message: The webhook URL must be a public HTTPS URL.
+                  type: devup_error
+                  code: invalid_webhook_url
+            invalid_request_body:
+              summary: The request body could not be read (not charged)
+              value:
+                error:
+                  message: The request body could not be read.
+                  type: devup_error
+                  code: invalid_request_body
     ImagePayloadTooLarge:
       description: >
         The request body of `POST /v1/images/generations` or
@@ -3062,7 +3498,8 @@ components:
     PayloadTooLarge:
       description: >
         The request body of `POST /v1/responses`, `POST /v1/embeddings`,
-        `POST /v1/rerank` or `POST /v1/audio/transcriptions` is larger than
+        `POST /v1/rerank`, `POST /v1/audio/transcriptions`, `POST /v1/audio/speech`
+        or `POST /v1/inference/{model_path}` is larger than
         10,485,760 bytes (10 MiB). Uploaded files and Base64-encoded file data
         count toward this limit. The body is not processed and the request is
         not charged.
@@ -3155,7 +3592,7 @@ components:
               summary: Scoped credential does not permit the requested model (scoped-token auth only)
               value:
                 error:
-                  message: "This scoped token does not grant access to the requested model."
+                  message: 'This scoped token does not grant access to model "deepseek-ai/DeepSeek-V4-Pro". Allowed: meta-llama/Llama-3.3-70B-Instruct'
                   type: devup_error
                   code: model_not_allowed
     InsufficientBalance:
@@ -3244,9 +3681,9 @@ components:
                   code: model_at_capacity
     RequestNotCompleted:
       description: |
-        The request could not be completed. Retry later or contact support.
+        The model did not complete this request, or its answer could not be read. The request may already have been processed and billed: check its outcome before sending it again.
 
-        The example body is illustrative: `request_failed` is an example value of `error.code`.
+        The code is `DEVUP_COMPUTE_ERROR`. See https://docs.devupai.com/docs/errors#error-DEVUP_COMPUTE_ERROR.
       headers:
         x-request-id:
           $ref: '#/components/headers/XRequestId'
@@ -3258,14 +3695,14 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
-              message: The request could not be completed. Retry later or contact support.
+              message: The model could not complete this request.
               type: devup_error
-              code: request_failed
+              code: DEVUP_COMPUTE_ERROR
     InternalError:
       description: |
-        The request could not be completed. Retry later or contact support.
+        The request did not complete. It may already have been processed and billed: check its outcome before sending it again, or contact support with the request ID.
 
-        The example body is illustrative: `request_failed` is an example value of `error.code`.
+        In the example, the code is `server_error`, with the message of `POST /v1/images/generations` when the model returned no image data. The codes with this status are listed at https://docs.devupai.com/docs/errors.
       headers:
         x-request-id:
           $ref: '#/components/headers/XRequestId'
@@ -3277,14 +3714,14 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
-              message: The request could not be completed. Retry later or contact support.
+              message: No image data was returned.
               type: devup_error
-              code: request_failed
+              code: server_error
     Conflict:
       description: |
-        The request could not be completed. Retry later or contact support.
+        The outcome of this request is not known yet. It needs confirmation before the operation is sent again.
 
-        The example body is illustrative: `request_failed` is an example value of `error.code`.
+        The code is `request_outcome_pending`. See https://docs.devupai.com/docs/errors#error-request_outcome_pending.
       headers:
         x-request-id:
           $ref: '#/components/headers/XRequestId'
@@ -3296,9 +3733,9 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
-              message: The request could not be completed. Retry later or contact support.
+              message: The outcome of this request must be confirmed before it can be repeated. Contact support with the request ID.
               type: devup_error
-              code: request_failed
+              code: request_outcome_pending
     UnprocessableRequest:
       description: The request was not accepted in its current form.
       headers:
@@ -3334,11 +3771,11 @@ components:
                   code: invalid_request_error
     NotFound:
       description: >
-        The requested model identifier was not found in the catalog, or no
-        endpoint exists at the method and path. It is not retryable unless the
-        model identifier, or the method and path, are changed. On
-        `POST /v1/chat/completions`, `POST /v1/responses`, `POST /v1/rerank`,
-        `POST /v1/video/generations` and `POST /v1/inference/{model_path}`, a
+        The requested model is not listed on `GET /v1/models`, or is not
+        available, or no endpoint exists at the method and path. It is not
+        retryable unless the
+        model identifier, or the method and path, are changed. On every
+        endpoint that takes a model, a
         model identifier longer than 200 characters, or one that is not one or
         more segments joined by `/`, each starting with a letter or digit and
         made only of letters, digits, `.`, `_` and `-`, returns HTTP 404
@@ -3429,8 +3866,10 @@ components:
               description: >
                 Machine-readable error code. The codes you can act on, their HTTP status
                 and what to do are listed at https://docs.devupai.com/docs/errors. A 400
-                is not fixed by retrying the same request; a 429, 502 or 503 can be
-                retried after a short wait.
+                is not fixed by retrying the same request; a 429 or 503 can be retried
+                after a short wait (use `Retry-After` when the response carries it). A
+                500 or 502 may come after the request was already processed and billed:
+                check its outcome before sending it again.
 
     DevUpBilling:
       type: object
@@ -3933,15 +4372,15 @@ components:
         `error` object as an HTTP error response, followed by `data: [DONE]`. No other
         event follows. An error before the first event is answered with its HTTP status
         instead of a stream. The codes you can act on are listed at
-        https://docs.devupai.com/docs/errors. In the example, `request_failed` is an
-        example value of `error.code`.
+        https://docs.devupai.com/docs/errors. In the example, the model did not
+        complete the request (`DEVUP_COMPUTE_ERROR`).
       allOf:
         - $ref: '#/components/schemas/ErrorResponse'
       example:
         error:
-          message: The request could not be completed. Retry later or contact support.
+          message: The model could not complete this request.
           type: devup_error
-          code: request_failed
+          code: DEVUP_COMPUTE_ERROR
 
     # ── Responses ──
     ResponsesRequest:
@@ -4300,7 +4739,7 @@ components:
         The last event of a `POST /v1/responses` stream whose response could not be
         completed. It follows the `response.failed` event, and nothing is sent after
         it. The HTTP status of the stream stays 200, so read the error from this
-        event. In the example, `request_failed` is an example value of `code`.
+        event. In the example, the code is `server_error`.
       required: [type, sequence_number, code, message, error]
       properties:
         type:
@@ -4330,13 +4769,13 @@ components:
       example:
         type: error
         sequence_number: 11
-        code: request_failed
-        message: The request could not be completed. Retry later or contact support.
+        code: server_error
+        message: The model could not complete this request.
         param: null
         error:
-          message: The request could not be completed. Retry later or contact support.
+          message: The model could not complete this request.
           type: devup_error
-          code: request_failed
+          code: server_error
 
     # ── Embeddings ──
     EmbeddingRequest:
@@ -4974,7 +5413,9 @@ components:
           type: string
           enum: [mp3, opus, aac, flac, wav, pcm]
           default: mp3
-          description: Audio output format.
+          description: >
+            Audio output format, in any letter case. Another value returns
+            HTTP 400 `invalid_response_format`, and the request is not charged.
         referenceAudioUrl:
           type: string
           format: uri
@@ -5664,6 +6105,13 @@ components:
           description: >
             The model's creator or organization, taken from `id`: the part before its
             first `/`, or the whole `id` when it contains no `/`.
+        family:
+          type: string
+          description: >
+            The slug of the model family the model belongs to, for example `deepseek`
+            or `qwen`. Present when the model belongs to a family; absent otherwise.
+            New values can be added.
+          example: deepseek
         type:
           type: string
           description: >
@@ -5686,8 +6134,8 @@ components:
             value the model accepts for `max_tokens` and `max_completion_tokens` on
             `POST /v1/chat/completions`, for
             `max_output_tokens` on `POST /v1/responses`, and for `max_tokens` on
-            `POST /anthropic/v1/messages`. A larger value returns HTTP 400
-            `invalid_max_tokens` (on `POST /anthropic/v1/messages`, the same message in an
+            the Messages-compatible endpoint. A larger value returns HTTP 400
+            `invalid_max_tokens` (on the Messages-compatible endpoint, the same message in an
             `invalid_request_error`). A request that sends none of these parameters is
             limited to the model's default output length, which is at most this value.
             Listed for models that generate text (`type` `text-generation`).
@@ -6174,3 +6622,322 @@ components:
           type: string
           enum: [ok, error]
           description: Platform health status.
+
+    # ── Messages ──
+    MessagesRequest:
+      type: object
+      description: >
+        A request in the Messages format. Fields not listed here are accepted and
+        do not change the reply.
+      required: [model, messages]
+      properties:
+        model:
+          type: string
+          description: The model `id`, exactly as listed by `GET /v1/models`.
+          example: deepseek-ai/DeepSeek-V4-Pro
+        messages:
+          type: array
+          description: >
+            The conversation, oldest message first. A final `assistant` message is
+            kept as conversation history, and the model answers with a new
+            assistant message.
+          items:
+            $ref: '#/components/schemas/MessagesMessage'
+        max_tokens:
+          type: integer
+          minimum: 1
+          description: >
+            Maximum number of tokens to generate, at most the model's
+            `max_output_tokens` from `GET /v1/models`. A larger value returns HTTP
+            400 `invalid_request_error`.
+        system:
+          description: System prompt, as a string or as an array of `text` blocks.
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: object
+                required: [type, text]
+                properties:
+                  type:
+                    type: string
+                    enum: [text]
+                  text:
+                    type: string
+        temperature:
+          type: number
+          description: Sampling temperature.
+        top_p:
+          type: number
+          description: Nucleus sampling probability mass.
+        top_k:
+          type: integer
+          description: Accepted for compatibility; it does not change the reply.
+        stop_sequences:
+          type: array
+          description: Sequences at which the model stops generating.
+          items:
+            type: string
+        stream:
+          type: boolean
+          default: false
+          description: When `true`, the reply is streamed as Server-Sent Events.
+        tools:
+          type: array
+          description: >
+            Tools the model may call. A model without tool support returns HTTP 400
+            `invalid_request_error`.
+          items:
+            type: object
+            required: [name, input_schema]
+            properties:
+              name:
+                type: string
+                description: Tool name.
+              description:
+                type: string
+                description: What the tool does.
+              input_schema:
+                type: object
+                additionalProperties: true
+                description: JSON Schema of the tool input.
+        tool_choice:
+          description: >
+            How the model uses `tools`. `auto`, the model decides; `any`, it calls
+            one of the tools; `tool`, it calls the tool named in `name`; `none`, it
+            calls no tool.
+          oneOf:
+            - type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [auto, any, none]
+            - type: object
+              required: [type, name]
+              properties:
+                type:
+                  type: string
+                  enum: [tool]
+                name:
+                  type: string
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Accepted for compatibility; it does not change the reply.
+
+    MessagesMessage:
+      type: object
+      description: One message of the conversation.
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          description: >
+            A string, or an array of content blocks. `user` messages carry `text`,
+            `image` and `tool_result` blocks; `assistant` messages carry `text` and
+            `tool_use` blocks.
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                $ref: '#/components/schemas/MessagesContentBlock'
+
+    MessagesContentBlock:
+      description: One content block of a message or a reply.
+      oneOf:
+        - type: object
+          title: Text block
+          required: [type, text]
+          properties:
+            type:
+              type: string
+              enum: [text]
+            text:
+              type: string
+        - type: object
+          title: Image block
+          description: >
+            An image, Base64-encoded. A model whose `supports.vision` is false
+            answers HTTP 400 `invalid_request_error`.
+          required: [type, source]
+          properties:
+            type:
+              type: string
+              enum: [image]
+            source:
+              type: object
+              required: [type, media_type, data]
+              properties:
+                type:
+                  type: string
+                  enum: [base64]
+                media_type:
+                  type: string
+                  description: The image type, such as `image/png` or `image/jpeg`.
+                data:
+                  type: string
+                  description: Base64-encoded image data.
+        - type: object
+          title: Tool use block
+          description: A tool call by the model, in an `assistant` message or a reply.
+          required: [type, id, name, input]
+          properties:
+            type:
+              type: string
+              enum: [tool_use]
+            id:
+              type: string
+              description: Tool call identifier, referenced by the `tool_result` block.
+            name:
+              type: string
+              description: Name of the tool called.
+            input:
+              type: object
+              additionalProperties: true
+              description: The tool input, matching the tool's `input_schema`.
+        - type: object
+          title: Tool result block
+          description: The result of a tool call, in a `user` message.
+          required: [type, tool_use_id]
+          properties:
+            type:
+              type: string
+              enum: [tool_result]
+            tool_use_id:
+              type: string
+              description: The `id` of the `tool_use` block this result answers.
+            content:
+              description: The result, as a string or as an array of `text` blocks.
+              oneOf:
+                - type: string
+                - type: array
+                  items:
+                    type: object
+                    required: [type, text]
+                    properties:
+                      type:
+                        type: string
+                        enum: [text]
+                      text:
+                        type: string
+            is_error:
+              type: boolean
+              description: "`true` when the tool call returned an error."
+
+    MessagesResponse:
+      type: object
+      description: A reply in the Messages format.
+      required: [id, type, role, model, content, stop_reason, stop_sequence, usage]
+      properties:
+        id:
+          type: string
+          description: Message identifier, starting with `msg_`.
+        type:
+          type: string
+          enum: [message]
+        role:
+          type: string
+          enum: [assistant]
+        model:
+          type: string
+          description: The model, as named in the request.
+        content:
+          type: array
+          description: The reply, as `text` and `tool_use` blocks.
+          items:
+            $ref: '#/components/schemas/MessagesContentBlock'
+        stop_reason:
+          type: [string, "null"]
+          enum: [end_turn, max_tokens, tool_use, null]
+          description: >
+            Why the model stopped. `end_turn`, the reply is complete; `max_tokens`,
+            the reply reached `max_tokens`; `tool_use`, the model called a tool.
+        stop_sequence:
+          type: [string, "null"]
+          description: "`null` on this endpoint."
+        usage:
+          type: object
+          required: [input_tokens, output_tokens]
+          properties:
+            input_tokens:
+              type: integer
+              description: Number of input tokens.
+            output_tokens:
+              type: integer
+              description: Number of output tokens.
+
+    MessagesStreamEvent:
+      type: object
+      description: >
+        The `data:` object of one event in a streamed reply. `type` names the event
+        and is the same as its `event:` line.
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [message_start, content_block_start, content_block_delta, content_block_stop, message_delta, message_stop]
+        message:
+          $ref: '#/components/schemas/MessagesResponse'
+          description: "`message_start` only: the message, with empty `content` and `stop_reason` `null`."
+        index:
+          type: integer
+          description: "`content_block_start`, `content_block_delta` and `content_block_stop`: the position of the content block."
+        content_block:
+          $ref: '#/components/schemas/MessagesContentBlock'
+          description: "`content_block_start` only: the block, with empty `text` or `input`."
+        delta:
+          type: object
+          description: >
+            `content_block_delta`: `type` `text_delta` with `text`, or `type`
+            `input_json_delta` with `partial_json` (a fragment of the tool input
+            JSON). `message_delta`: `stop_reason` and `stop_sequence`.
+          properties:
+            type:
+              type: string
+              enum: [text_delta, input_json_delta]
+            text:
+              type: string
+            partial_json:
+              type: string
+            stop_reason:
+              type: [string, "null"]
+              enum: [end_turn, max_tokens, tool_use, null]
+            stop_sequence:
+              type: [string, "null"]
+        usage:
+          type: object
+          description: "`message_delta` only: token counts."
+          properties:
+            input_tokens:
+              type: integer
+            output_tokens:
+              type: integer
+
+    MessagesErrorResponse:
+      type: object
+      description: The error object of the Messages-compatible endpoint, in the Messages format.
+      required: [type, error]
+      properties:
+        type:
+          type: string
+          enum: [error]
+        error:
+          type: object
+          required: [type, message]
+          properties:
+            type:
+              type: string
+              enum: [invalid_request_error, authentication_error, permission_error, not_found_error, request_too_large, rate_limit_error, api_error, overloaded_error]
+              description: >
+                Error category, set by the HTTP status. 400, 402, 409, 415 and 422,
+                `invalid_request_error`; 401, `authentication_error`; 403,
+                `permission_error`; 404, `not_found_error`; 413,
+                `request_too_large`; 429, `rate_limit_error`; 500, 502 and 503,
+                `api_error`; 529, `overloaded_error`. The `error` event sent when a
+                stream cannot be read carries `api_error`.
+            message:
+              type: string
+              description: Human-readable message.

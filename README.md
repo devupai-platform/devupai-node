@@ -1055,6 +1055,16 @@ response with its `ETag` header. An `If-None-Match` header given in `headers`
 Image models also carry `image_params`, their image options; see
 [Model Options](#model-options).
 
+A model object can also carry `family`, a short key for the model's family.
+It is present when the model belongs to a family and absent otherwise, so
+read it as an optional string. New values can be added, so do not treat the
+values you know as a complete list.
+
+```typescript
+const model = await client.models.retrieve("<model-id>");
+if (model.family === "<family>") console.log(model.id); // `family` is `string | undefined`
+```
+
 ```typescript
 import DevupAI from "devupai";
 
@@ -1815,6 +1825,14 @@ signature.
 - **Multipart image fields:** on image generation and edits, a field such as
   `n` or `size`, or a structured option, sent more than once returns HTTP 400
   `invalid_value`.
+- **Request size on speech and native inference:** `audio.speech.create()`
+  and `inference.run()` document HTTP 413 `payload_too_large` for a request
+  body above the limit.
+- **Error examples:** the documented error examples use
+  `DEVUP_COMPUTE_ERROR` (502), `server_error` (500), and
+  `request_outcome_pending` (409). See [Error Handling](#error-handling).
+- **Model family:** model objects can carry `family`; see
+  [Models, Balance, and Health](#models-balance-and-health).
 
 ---
 
