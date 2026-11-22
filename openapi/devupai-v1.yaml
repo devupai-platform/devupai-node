@@ -3826,6 +3826,14 @@ components:
           schema:
             type: integer
           description: Milliseconds to wait before retrying; the same delay as `Retry-After`.
+        x-should-retry:
+          schema:
+            type: string
+            enum: ['false']
+          description: >
+            Sent (`false`) with the `service_unavailable` answer whose message asks to contact
+            support with the request ID before repeating it. Confirm the outcome of the request
+            before sending it again.
       content:
         application/json:
           schema:

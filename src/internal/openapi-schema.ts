@@ -2240,6 +2240,8 @@ export interface components {
                 "Retry-After"?: number;
                 /** @description Milliseconds to wait before retrying; the same delay as `Retry-After`. */
                 "retry-after-ms"?: number;
+                /** @description Sent (`false`) with the `service_unavailable` answer whose message asks to contact support with the request ID before repeating it. Confirm the outcome of the request before sending it again. */
+                "x-should-retry"?: "false";
                 [name: string]: unknown;
             };
             content: {
