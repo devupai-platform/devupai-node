@@ -3,6 +3,20 @@
 All notable changes to the `devupai` package are listed here. Earlier 3.x
 entries are in [docs/v3/CHANGELOG_V3.md](https://github.com/devupai-platform/devupai-node/blob/main/docs/v3/CHANGELOG_V3.md).
 
+## [4.3.1]
+
+No breaking changes. A request whose answer carries `x-should-retry: false`
+is not sent again. Upgrade with `npm install devupai@latest`.
+
+### Changed
+
+- The `DevupAI` client does not send a request again when its answer carries
+  `x-should-retry: false`, whatever the status, the method or `maxRetries`.
+  This applies to every method, to `.withResponse()` calls and to streams.
+  The error you receive is the same as before. Any other value of the
+  header, or no header, keeps the retries described in the README;
+  `x-should-retry: true` adds no retries.
+
 ## [4.3.0]
 
 No breaking changes. An HTTP 415 answer is now an

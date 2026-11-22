@@ -159,6 +159,19 @@ export const BILLED_POST_RETRY: RetryPolicy = {
 };
 
 /**
+ * True when the answer carries `x-should-retry: false`: the request is not sent again.
+ *
+ * `Headers.get` matches the name without regard to case; the value is trimmed and compared,
+ * lower-cased, to `false`. Any other value, or no header, leaves the retry rules unchanged.
+ * Only `false` is honoured: `x-should-retry: true` never widens them, because a retry it
+ * allowed could send a billed request again (a billed `POST` is still sent again only after
+ * 429, 503 or a connection that was never opened).
+ */
+function retryRefused(headers: Headers): boolean {
+    return headers.get("x-should-retry")?.trim().toLowerCase() === "false";
+}
+
+/**
  * Error codes showing that a connection was never opened (refused, name not resolved, or
  * connect timeout), so the request was not sent. Node's `fetch` reports them on the `cause`
  * of its `TypeError` (an `Error`, or an `AggregateError` when several addresses were tried).
@@ -502,7 +515,10 @@ export class APIClient {
                         // The body could not be read: the message falls back to the HTTP status.
                     }
                     const error = errorFromBody(response.status, text, response.headers);
-                    if (attempt < maxRetries && retry.statuses.has(response.status)) {
+                    // Checked before the status rules: an answer that asks for no new attempt is never
+                    // sent again, whatever its status, the method or the retry budget (plain, raw and
+                    // stream calls all come here).
+                    if (!retryRefused(response.headers) && attempt < maxRetries && retry.statuses.has(response.status)) {
                         const waitMs = this.#retryWait(error.retryAfterMs, attempt, deadline);
                         if (waitMs !== null) {
                             this.#debug({

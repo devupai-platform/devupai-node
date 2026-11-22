@@ -1583,9 +1583,11 @@ these on every request. `maxRetries` applies to both groups, and
 `maxRetries: 0` turns retries off.
 
 On billed requests, a 429 or 503 answer is sent again after the wait described
-above, up to `maxRetries` times. This includes a
-503 whose message asks you to contact support before repeating the request.
-To check the request's outcome first, set `maxRetries: 0` on that call.
+above, up to `maxRetries` times.
+
+If a response carries `x-should-retry: false`, the SDK does not resend the
+request. A 503 whose message asks you to contact support before repeating the
+request carries this header, so it is returned to you after one attempt.
 
 ```typescript
 import DevupAI from "devupai";
