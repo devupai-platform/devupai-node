@@ -2117,7 +2117,7 @@ export interface components {
                 "x-client-request-id": components["headers"]["XClientRequestId"];
                 /** @description Seconds to wait before retrying. */
                 "Retry-After"?: number;
-                /** @description Milliseconds to wait before retrying (`model_at_capacity` only). */
+                /** @description Milliseconds to wait before retrying; the same delay as `Retry-After`. */
                 "retry-after-ms"?: number;
                 /** @description Maximum requests allowed in the current window (per-minute limit only). */
                 "X-RateLimit-Limit"?: number;
@@ -2192,6 +2192,8 @@ export interface components {
             headers: {
                 "x-request-id": components["headers"]["XRequestId"];
                 "x-client-request-id": components["headers"]["XClientRequestId"];
+                /** @description Always `false`. Confirm the outcome of the request before sending it again. */
+                "x-should-retry"?: "false";
                 [name: string]: unknown;
             };
             content: {
@@ -2236,7 +2238,7 @@ export interface components {
                 "x-client-request-id": components["headers"]["XClientRequestId"];
                 /** @description Seconds to wait before retrying. */
                 "Retry-After"?: number;
-                /** @description Milliseconds to wait before retrying. */
+                /** @description Milliseconds to wait before retrying; the same delay as `Retry-After`. */
                 "retry-after-ms"?: number;
                 [name: string]: unknown;
             };
@@ -2694,7 +2696,7 @@ export interface operations {
                     "x-client-request-id": components["headers"]["XClientRequestId"];
                     /** @description Seconds to wait before retrying. */
                     "Retry-After"?: number;
-                    /** @description Milliseconds to wait before retrying, for the limits that send it. */
+                    /** @description Milliseconds to wait before retrying; the same delay as `Retry-After`. */
                     "retry-after-ms"?: number;
                     [name: string]: unknown;
                 };
@@ -2758,7 +2760,7 @@ export interface operations {
                     "x-client-request-id": components["headers"]["XClientRequestId"];
                     /** @description Seconds to wait before retrying. */
                     "Retry-After"?: number;
-                    /** @description Milliseconds to wait before retrying, when sent. */
+                    /** @description Milliseconds to wait before retrying; the same delay as `Retry-After`. */
                     "retry-after-ms"?: number;
                     [name: string]: unknown;
                 };
@@ -3472,7 +3474,7 @@ export interface operations {
                     "x-client-request-id": components["headers"]["XClientRequestId"];
                     /** @description Seconds to wait before retrying (5 for model at capacity; varies for rate limit). */
                     "Retry-After"?: number;
-                    /** @description Milliseconds to wait before retrying (model_at_capacity only). */
+                    /** @description Milliseconds to wait before retrying; the same delay as `Retry-After`. */
                     "retry-after-ms"?: number;
                     [name: string]: unknown;
                 };

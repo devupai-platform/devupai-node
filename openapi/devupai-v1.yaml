@@ -871,7 +871,7 @@ paths:
             retry-after-ms:
               schema:
                 type: integer
-              description: Milliseconds to wait before retrying, for the limits that send it.
+              description: Milliseconds to wait before retrying; the same delay as `Retry-After`.
           description: >
             Too many requests (`rate_limit_error`): the account's per-minute,
             concurrency or tokens-per-minute limit. Wait the number of seconds in
@@ -931,7 +931,7 @@ paths:
             retry-after-ms:
               schema:
                 type: integer
-              description: Milliseconds to wait before retrying, when sent.
+              description: Milliseconds to wait before retrying; the same delay as `Retry-After`.
           description: >
             The model is temporarily unavailable, or requests are paused for a few
             seconds (`api_error`). Retry after the delay in `Retry-After`.
@@ -2630,7 +2630,7 @@ paths:
             retry-after-ms:
               schema:
                 type: integer
-              description: Milliseconds to wait before retrying (model_at_capacity only).
+              description: Milliseconds to wait before retrying; the same delay as `Retry-After`.
           content:
             application/json:
               schema:
@@ -3639,7 +3639,7 @@ components:
         retry-after-ms:
           schema:
             type: integer
-          description: Milliseconds to wait before retrying (`model_at_capacity` only).
+          description: Milliseconds to wait before retrying; the same delay as `Retry-After`.
         X-RateLimit-Limit:
           schema:
             type: integer
@@ -3727,6 +3727,11 @@ components:
           $ref: '#/components/headers/XRequestId'
         x-client-request-id:
           $ref: '#/components/headers/XClientRequestId'
+        x-should-retry:
+          schema:
+            type: string
+            enum: ['false']
+          description: Always `false`. Confirm the outcome of the request before sending it again.
       content:
         application/json:
           schema:
@@ -3820,7 +3825,7 @@ components:
         retry-after-ms:
           schema:
             type: integer
-          description: Milliseconds to wait before retrying.
+          description: Milliseconds to wait before retrying; the same delay as `Retry-After`.
       content:
         application/json:
           schema:
